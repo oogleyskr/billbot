@@ -1,5 +1,10 @@
 import type { GatewayRequestHandlers } from "./types.js";
 import { getStatusSummary } from "../../commands/status.js";
+import { loadConfig } from "../../config/config.js";
+import {
+  getInfrastructureSnapshot,
+  probeInfrastructure,
+} from "../../infra/infrastructure-monitor.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { HEALTH_REFRESH_INTERVAL_MS } from "../server-constants.js";
 import { formatError } from "../server-utils.js";
@@ -28,5 +33,19 @@ export const healthHandlers: GatewayRequestHandlers = {
   status: async ({ respond }) => {
     const status = await getStatusSummary();
     respond(true, status, undefined);
+  },
+  infrastructure: async ({ respond, params }) => {
+    try {
+      const wantsProbe = params?.probe === true;
+      if (wantsProbe) {
+        const cfg = loadConfig();
+        const snap = await probeInfrastructure(cfg);
+        respond(true, snap, undefined);
+      } else {
+        respond(true, getInfrastructureSnapshot(), undefined);
+      }
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(err)));
+    }
   },
 };

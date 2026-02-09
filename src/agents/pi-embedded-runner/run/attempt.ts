@@ -85,7 +85,9 @@ import {
   buildEmbeddedSystemPrompt,
   createSystemPromptOverride,
 } from "../system-prompt.js";
+import { createToolCallParserWrapper } from "../tool-call-parser.js";
 import { splitSdkTools } from "../tool-split.js";
+import { resolveExecToolDefaults } from "../utils.js";
 import { describeUnknownError, mapThinkingLevel } from "../utils.js";
 import { detectAndLoadPromptImages } from "./images.js";
 
@@ -210,8 +212,10 @@ export async function runEmbeddedAttempt(
       ? []
       : createOpenClawCodingTools({
           exec: {
+            ...resolveExecToolDefaults(params.config),
             ...params.execOverrides,
             elevated: params.bashElevated,
+            senderIsOwner: params.senderIsOwner,
           },
           sandbox,
           messageProvider: params.messageChannel ?? params.messageProvider,
@@ -524,6 +528,19 @@ export async function runEmbeddedAttempt(
         params.modelId,
         params.streamParams,
       );
+
+      // Apply tool call parser for models that emit non-standard tool call formats
+      // (e.g., <tool_call> XML tags instead of native tool_calls in the response).
+      // This is configured via compat.toolCallPatterns in the model definition.
+      const modelCompat = params.model?.compat;
+      const toolCallParserFn = createToolCallParserWrapper(
+        activeSession.agent.streamFn,
+        modelCompat,
+      );
+      if (toolCallParserFn) {
+        log.debug(`applying tool call parser wrapper for ${params.provider}/${params.modelId}`);
+        activeSession.agent.streamFn = toolCallParserFn;
+      }
 
       if (cacheTrace) {
         cacheTrace.recordStage("session:loaded", {

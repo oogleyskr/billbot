@@ -1,0 +1,123 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.6-3-fork",
+    "lastTouchedAt": "2026-02-08T00:00:00.000Z"
+  },
+  "models": {
+    "providers": {
+      "spark": {
+        "baseUrl": "http://localhost:8001/v1",
+        "apiKey": "not-required",
+        "api": "openai-completions",
+        "healthCheck": {
+          "enabled": true,
+          "endpoint": "/v1/models",
+          "intervalSeconds": 30
+        },
+        "retry": {
+          "attempts": 3,
+          "minDelayMs": 1000,
+          "maxDelayMs": 10000
+        },
+        "models": [
+          {
+            "id": "qwen3-coder-next-awq",
+            "name": "Qwen3 Coder Next AWQ 4bit (vLLM on DGX Spark)",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 32768,
+            "maxTokens": 8192,
+            "compat": {
+              "supportsStore": false,
+              "supportsStrictMode": false,
+              "supportsUsageInStreaming": false,
+              "toolCallPatterns": [
+                { "tag": "tool_call" },
+                { "tag": "tools" }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "spark/qwen3-coder-next-awq"
+      },
+      "timeoutSeconds": 600
+    }
+  },
+  "tools": {
+    "exec": {
+      "host": "gateway",
+      "security": "allowlist",
+      "ask": "on-miss",
+      "ownerOverrides": {
+        "security": "full",
+        "ask": "off"
+      },
+      "denyPaths": [
+        "/home/mferr/.openclaw",
+        "/home/mferr/.npm-global/lib/node_modules/openclaw"
+      ]
+    },
+    "web": {
+      "search": {
+        "enabled": true,
+        "apiKey": "YOUR_BRAVE_API_KEY"
+      },
+      "fetch": {
+        "enabled": true
+      }
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "ownerAllowFrom": ["297472147901644802"]
+  },
+  "infrastructure": {
+    "tunnels": [
+      {
+        "label": "DGX Spark SSH Tunnel",
+        "host": "localhost",
+        "port": 8001,
+        "serviceName": "dgx-spark-tunnel",
+        "timeoutMs": 5000
+      }
+    ],
+    "gpu": {
+      "enabled": true,
+      "mode": "remote",
+      "sshHost": "10.0.0.109",
+      "sshUser": "mferry",
+      "sshKeyPath": "/home/mferr/.ssh/nvsync.key",
+      "intervalSeconds": 30
+    }
+  },
+  "channels": {
+    "discord": {
+      "enabled": true,
+      "token": "YOUR_DISCORD_TOKEN",
+      "groupPolicy": "open",
+      "guilds": {
+        "*": {
+          "requireMention": false
+        }
+      }
+    }
+  },
+  "logging": {
+    "level": "info",
+    "consoleLevel": "info"
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "token": "YOUR_GATEWAY_TOKEN"
+    }
+  }
+}

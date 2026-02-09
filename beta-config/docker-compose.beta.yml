@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  openclaw-beta:
+    build:
+      context: ..
+      dockerfile: beta-config/Dockerfile.beta
+    container_name: openclaw-beta
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      # Mount config (copy openclaw.json.example to openclaw.json and fill in secrets)
+      - ./openclaw.json:/root/.openclaw/openclaw.json:ro
+      # Mount SSH key for remote GPU metrics
+      - /home/mferr/.ssh/nvsync.key:/root/.ssh/nvsync.key:ro
+      # Persist session data
+      - openclaw-beta-data:/root/.openclaw/state
+    environment:
+      - NODE_ENV=production
+
+volumes:
+  openclaw-beta-data:

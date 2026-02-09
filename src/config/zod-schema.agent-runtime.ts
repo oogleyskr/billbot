@@ -285,6 +285,14 @@ export const AgentToolsSchema = z
           })
           .strict()
           .optional(),
+        ownerOverrides: z
+          .object({
+            security: z.enum(["deny", "allowlist", "full"]).optional(),
+            ask: z.enum(["off", "on-miss", "always"]).optional(),
+          })
+          .strict()
+          .optional(),
+        denyPaths: z.array(z.string()).optional(),
       })
       .strict()
       .optional(),
@@ -536,6 +544,14 @@ export const ToolsSchema = z
           })
           .strict()
           .optional(),
+        ownerOverrides: z
+          .object({
+            security: z.enum(["deny", "allowlist", "full"]).optional(),
+            ask: z.enum(["off", "on-miss", "always"]).optional(),
+          })
+          .strict()
+          .optional(),
+        denyPaths: z.array(z.string()).optional(),
       })
       .strict()
       .optional(),

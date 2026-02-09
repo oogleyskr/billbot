@@ -193,6 +193,22 @@ export type ExecToolConfig = {
      */
     allowModels?: string[];
   };
+  /**
+   * Override exec security/ask levels when the sender is the owner.
+   * Allows owners to auto-execute while non-owners require approval.
+   */
+  ownerOverrides?: {
+    /** Exec security mode for owners (overrides exec.security). */
+    security?: "deny" | "allowlist" | "full";
+    /** Exec ask mode for owners (overrides exec.ask). */
+    ask?: "off" | "on-miss" | "always";
+  };
+  /**
+   * Paths that exec commands are denied access to.
+   * Commands containing these paths (as arguments) will be blocked.
+   * Useful for preventing self-modification of config or installation directories.
+   */
+  denyPaths?: string[];
 };
 
 export type AgentToolsConfig = {

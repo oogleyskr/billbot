@@ -512,6 +512,42 @@ export const OpenClawSchema = z
       .strict()
       .optional(),
     memory: MemorySchema,
+    infrastructure: z
+      .object({
+        tunnels: z
+          .array(
+            z
+              .object({
+                label: z.string().optional(),
+                host: z.string().optional(),
+                port: z.number().int().min(1).max(65535),
+                serviceName: z
+                  .string()
+                  .regex(
+                    /^[a-zA-Z0-9._@:-]+$/,
+                    "service name must contain only alphanumeric, dot, underscore, @, colon, or hyphen",
+                  )
+                  .optional(),
+                timeoutMs: z.number().int().positive().optional(),
+              })
+              .strict(),
+          )
+          .optional(),
+        gpu: z
+          .object({
+            enabled: z.boolean().optional(),
+            mode: z.union([z.literal("local"), z.literal("remote")]).optional(),
+            sshHost: z.string().optional(),
+            sshUser: z.string().optional(),
+            sshKeyPath: z.string().optional(),
+            sshPort: z.number().int().min(1).max(65535).optional(),
+            intervalSeconds: z.number().int().positive().optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
     skills: z
       .object({
         allowBundled: z.array(z.string()).optional(),

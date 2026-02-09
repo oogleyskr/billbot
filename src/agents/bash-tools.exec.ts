@@ -182,6 +182,12 @@ export type ExecToolDefaults = {
   messageProvider?: string;
   notifyOnExit?: boolean;
   cwd?: string;
+  senderIsOwner?: boolean;
+  ownerOverrides?: {
+    security?: ExecSecurity;
+    ask?: ExecAsk;
+  };
+  denyPaths?: string[];
 };
 
 export type { BashSandboxConfig } from "./bash-tools.shared.js";
@@ -849,6 +855,45 @@ export function createExecTool(
         throw new Error("Provide a command to start.");
       }
 
+      // Check denyPaths: block write/modify commands that target denied paths.
+      // Read-only commands (cat, ls, head, tail, grep, etc.) are allowed.
+      const denyPaths = defaults?.denyPaths;
+      if (denyPaths && denyPaths.length > 0) {
+        const commandLower = params.command.toLowerCase();
+        for (const denied of denyPaths) {
+          if (!commandLower.includes(denied.toLowerCase())) {
+            continue;
+          }
+          // Check if this is a write/modify operation
+          const writePatterns = [
+            /\b(rm|rmdir|unlink)\b/, // delete
+            /\b(mv|rename)\b/, // move/rename
+            /\bcp\b/, // copy (could overwrite)
+            /\b(sed\s+-i|perl\s+-[ip]i?)\b/, // in-place edit
+            /\btee\b/, // write via tee
+            /\b(chmod|chown|chgrp)\b/, // permission changes
+            /\btruncate\b/, // truncate
+            /\b(dd|install)\b/, // block copy / install
+            /[>|]\s*[^|]/, // redirect output (>, >>)
+            /\bwrite\b/, // generic write
+            /\bpatch\b/, // patch
+            /\bmkdir\b/, // create directories
+            /\btouch\b/, // create/update files
+            /\bln\b/, // symlinks
+            /\bgit\b/, // git operations
+            /\bnpm\b/, // npm operations
+            /\bnode\b.*\b(dist|src)\b/, // running code that could modify
+          ];
+          const isWrite = writePatterns.some((p) => p.test(commandLower));
+          if (isWrite) {
+            throw new Error(
+              `exec denied: write operation references restricted path "${denied}". ` +
+                `This path is protected by tools.exec.denyPaths. Read-only access is allowed.`,
+            );
+          }
+        }
+      }
+
       const maxOutput = DEFAULT_MAX_OUTPUT;
       const pendingMaxOutput = DEFAULT_PENDING_MAX_OUTPUT;
       const warnings: string[] = [];
@@ -934,13 +979,18 @@ export function createExecTool(
         host = "gateway";
       }
 
-      const configuredSecurity = defaults?.security ?? (host === "sandbox" ? "deny" : "allowlist");
+      // Apply owner overrides: when sender is owner, use owner-specific security/ask if configured
+      const ownerOverrides = defaults?.senderIsOwner ? defaults?.ownerOverrides : undefined;
+      const baseSecurity = ownerOverrides?.security ?? defaults?.security;
+      const baseAsk = ownerOverrides?.ask ?? defaults?.ask;
+
+      const configuredSecurity = baseSecurity ?? (host === "sandbox" ? "deny" : "allowlist");
       const requestedSecurity = normalizeExecSecurity(params.security);
       let security = minSecurity(configuredSecurity, requestedSecurity ?? configuredSecurity);
       if (elevatedRequested && elevatedMode === "full") {
         security = "full";
       }
-      const configuredAsk = defaults?.ask ?? "on-miss";
+      const configuredAsk = baseAsk ?? "on-miss";
       const requestedAsk = normalizeExecAsk(params.ask);
       let ask = maxAsk(configuredAsk, requestedAsk ?? configuredAsk);
       const bypassApprovals = elevatedRequested && elevatedMode === "full";

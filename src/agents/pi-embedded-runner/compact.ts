@@ -221,6 +221,7 @@ export async function compactEmbeddedPiSessionDirect(
       exec: {
         ...resolveExecToolDefaults(params.config),
         elevated: params.bashElevated,
+        senderIsOwner: params.senderIsOwner,
       },
       sandbox,
       messageProvider: params.messageChannel ?? params.messageProvider,
