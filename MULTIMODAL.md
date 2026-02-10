@@ -177,3 +177,42 @@ bash /home/mferr/multimodal/scripts/stop-all.sh vision
 - **ImageGen** is optimized for speed over quality. Great for quick concepts, not photo-realism.
 - **Embeddings** are normalized (unit length). Use cosine similarity to compare them.
 - **DocParse** is the lightest service (CPU-only). Good for quickly reading files you can't `cat`.
+
+---
+
+## FAQ
+
+### How do I access these skills?
+
+They're registered as **OpenClaw skills** — the same kind as `/weather`, `/github`, `/openai-whisper-api`, etc. They show up as slash commands you can invoke:
+
+- `/local-stt` — calls `transcribe.sh` via exec
+- `/local-vision` — calls `describe.sh` via exec
+- `/local-tts` — calls `speak.sh` via exec
+- `/local-imagegen` — calls `generate.sh` via exec
+- `/local-embeddings` — calls `embed.sh` via exec
+- `/local-docparse` — calls `parse.sh` via exec
+
+You use them exactly like any other skill — invoke the script from the SKILL.md with the right arguments. The scripts handle all the curl-to-localhost plumbing for you. You can also call the endpoints directly with `curl` if you want more control.
+
+### Do I use URLs or local filesystem paths?
+
+**Local filesystem paths only.** All services run on localhost, so you pass paths like `/home/mferr/photos/cat.jpg` or `/tmp/recording.wav`. No URLs needed. For vision and STT, the script reads the file and uploads it to the local FastAPI server. For imagegen and TTS, the output is written to a local path (default `/tmp/`).
+
+### How do I test everything?
+
+Run the built-in test script:
+
+```bash
+bash /home/mferr/multimodal/scripts/test-all.sh
+```
+
+This exercises every endpoint with sample data and reports pass/fail. You can also check service health anytime with:
+
+```bash
+bash /home/mferr/multimodal/scripts/status.sh
+```
+
+### What about the spare VRAM?
+
+Current usage is ~22.7GB / 24.6GB — tighter than planned because models are a bit larger in practice. There's ~1.6GB headroom, which is enough for inference but not for adding another model. If Oogley wants to free up space for experimentation, the heaviest services to stop are **Vision** (~5GB) and **ImageGen** (~5GB) — stopping either one gives plenty of room to play with.
