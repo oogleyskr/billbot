@@ -52,6 +52,25 @@ export type TunnelResult = {
   error?: string;
 };
 
+export type SystemMetricsSnapshot = {
+  cpuUsagePercent?: number;
+  cpuTemperatureCelsius?: number;
+  ramUsedMB?: number;
+  ramTotalMB?: number;
+  ramUsagePercent?: number;
+  networkInKBps?: number;
+  networkOutKBps?: number;
+  collectedAt: number;
+  error?: string;
+};
+
+export type InferenceSpeedSnapshot = {
+  tokensPerSecond: number;
+  averageTokPerSec: number;
+  completionCount: number;
+  lastMeasuredAt: number;
+};
+
 export type InfrastructureData = {
   providers?: {
     providers: Record<string, ProviderHealthStatus>;
@@ -66,6 +85,8 @@ export type InfrastructureData = {
     servicesTotal: number;
     checkedAt: number;
   };
+  systemMetrics?: SystemMetricsSnapshot;
+  inferenceSpeed?: InferenceSpeedSnapshot;
   collectedAt: number;
 };
 

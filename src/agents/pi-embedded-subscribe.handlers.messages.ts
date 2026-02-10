@@ -2,6 +2,7 @@ import type { AgentEvent, AgentMessage } from "@mariozechner/pi-agent-core";
 import type { EmbeddedPiSubscribeContext } from "./pi-embedded-subscribe.handlers.types.js";
 import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
+import { recordInference } from "../infra/inference-speed.js";
 import { createInlineCodeState } from "../markdown/code-spans.js";
 import {
   isMessagingToolDuplicateNormalized,
@@ -16,6 +17,7 @@ import {
   formatReasoningMessage,
   promoteThinkingTagsToBlocks,
 } from "./pi-embedded-utils.js";
+import { normalizeUsage } from "./usage.js";
 
 const stripTrailingDirective = (text: string): string => {
   const openIndex = text.lastIndexOf("[[");
@@ -38,8 +40,11 @@ export function handleMessageStart(
     return;
   }
 
+  // Record start time for tok/s calculation in handleMessageEnd.
+  ctx.state.assistantMessageStartedAt = Date.now();
+
   // KNOWN: Resetting at `text_end` is unsafe (late/duplicate end events).
-  // ASSUME: `message_start` is the only reliable boundary for “new assistant message begins”.
+  // ASSUME: `message_start` is the only reliable boundary for "new assistant message begins".
   // Start-of-message is a safer reset point than message_end: some providers
   // may deliver late text_end updates after message_end, which would otherwise
   // re-trigger block replies.
@@ -199,6 +204,18 @@ export function handleMessageEnd(
 
   const assistantMessage = msg;
   ctx.recordAssistantUsage((assistantMessage as { usage?: unknown }).usage);
+
+  // Calculate and record tok/s for the Hardware tab.
+  if (ctx.state.assistantMessageStartedAt) {
+    const durationMs = Date.now() - ctx.state.assistantMessageStartedAt;
+    const usage = normalizeUsage((assistantMessage as { usage?: unknown }).usage as never);
+    const outputTokens = usage?.output ?? 0;
+    if (outputTokens > 0 && durationMs > 0) {
+      recordInference(outputTokens, durationMs);
+    }
+    ctx.state.assistantMessageStartedAt = undefined;
+  }
+
   promoteThinkingTagsToBlocks(assistantMessage);
 
   const rawText = extractAssistantText(assistantMessage);

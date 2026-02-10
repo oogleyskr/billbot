@@ -5,6 +5,7 @@ import {
   collectLocalGpuMetrics,
   collectRemoteGpuMetrics,
 } from "./gpu-metrics.js";
+import { type InferenceSpeedSnapshot, getInferenceSpeed } from "./inference-speed.js";
 import { type MultimodalHealthSnapshot, checkMultimodalHealth } from "./multimodal-health.js";
 import {
   type ProviderHealthSnapshot,
@@ -12,6 +13,7 @@ import {
   getProviderHealthSnapshot,
   stopProviderHealthMonitor,
 } from "./provider-health.js";
+import { type SystemMetricsSnapshot, collectSystemMetrics } from "./system-metrics.js";
 import { type TunnelMonitorResult, checkTunnelHealth } from "./tunnel-monitor.js";
 
 export type InfrastructureSnapshot = {
@@ -20,6 +22,8 @@ export type InfrastructureSnapshot = {
   gpu?: GpuMetricsSnapshot;
   localGpu?: GpuMetricsSnapshot;
   multimodal?: MultimodalHealthSnapshot;
+  systemMetrics?: SystemMetricsSnapshot;
+  inferenceSpeed?: InferenceSpeedSnapshot;
   collectedAt: number;
 };
 
@@ -30,6 +34,7 @@ let localGpuInterval: ReturnType<typeof setInterval> | null = null;
 let tunnelInterval: ReturnType<typeof setInterval> | null = null;
 let providerInterval: ReturnType<typeof setInterval> | null = null;
 let multimodalInterval: ReturnType<typeof setInterval> | null = null;
+let systemMetricsInterval: ReturnType<typeof setInterval> | null = null;
 
 // Cached results from the most recent polling cycle. The gateway's RPC
 // handler reads these via getInfrastructureSnapshot() without triggering
@@ -38,6 +43,7 @@ let cachedGpu: GpuMetricsSnapshot | null = null;
 let cachedLocalGpu: GpuMetricsSnapshot | null = null;
 let cachedTunnels: TunnelMonitorResult[] | null = null;
 let cachedMultimodal: MultimodalHealthSnapshot | null = null;
+let cachedSystemMetrics: SystemMetricsSnapshot | null = null;
 
 /** Refresh GPU metrics from local or remote nvidia-smi and cache the result. */
 async function refreshGpuMetrics(infraCfg: InfrastructureConfig): Promise<void> {
@@ -81,6 +87,11 @@ async function refreshMultimodal(infraCfg: InfrastructureConfig): Promise<void> 
   cachedMultimodal = await checkMultimodalHealth(configs);
 }
 
+/** Collect system metrics (CPU, RAM, network) and cache the result. */
+async function refreshSystemMetrics(): Promise<void> {
+  cachedSystemMetrics = await collectSystemMetrics();
+}
+
 /** Check all configured tunnels in parallel and cache the results. */
 async function refreshTunnels(infraCfg: InfrastructureConfig): Promise<void> {
   const tunnelConfigs = infraCfg.tunnels;
@@ -112,6 +123,8 @@ export function getInfrastructureSnapshot(): InfrastructureSnapshot {
     gpu: cachedGpu ?? undefined,
     localGpu: cachedLocalGpu ?? undefined,
     multimodal: cachedMultimodal ?? undefined,
+    systemMetrics: cachedSystemMetrics ?? undefined,
+    inferenceSpeed: getInferenceSpeed() ?? undefined,
     collectedAt: Date.now(),
   };
 }
@@ -146,6 +159,11 @@ export async function probeInfrastructure(cfg: OpenClawConfig): Promise<Infrastr
     // Multimodal services
     if (infraCfg.multimodal && infraCfg.multimodal.length > 0) {
       tasks.push(refreshMultimodal(infraCfg));
+    }
+
+    // System metrics
+    if (infraCfg.systemMetrics?.enabled) {
+      tasks.push(refreshSystemMetrics());
     }
   }
 
@@ -226,6 +244,16 @@ export function startInfrastructureMonitor(cfg: OpenClawConfig): void {
     }, 10_000);
     multimodalInterval.unref();
   }
+
+  // System metrics (CPU, RAM, network)
+  if (infraCfg.systemMetrics?.enabled) {
+    const sysIntervalSec = infraCfg.systemMetrics.intervalSeconds ?? 10;
+    void refreshSystemMetrics();
+    systemMetricsInterval = setInterval(() => {
+      void refreshSystemMetrics();
+    }, sysIntervalSec * 1000);
+    systemMetricsInterval.unref();
+  }
 }
 
 /**
@@ -254,9 +282,14 @@ export function stopInfrastructureMonitor(): void {
     clearInterval(multimodalInterval);
     multimodalInterval = null;
   }
+  if (systemMetricsInterval) {
+    clearInterval(systemMetricsInterval);
+    systemMetricsInterval = null;
+  }
 
   cachedGpu = null;
   cachedLocalGpu = null;
   cachedTunnels = null;
   cachedMultimodal = null;
+  cachedSystemMetrics = null;
 }

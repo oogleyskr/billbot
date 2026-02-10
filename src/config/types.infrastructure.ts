@@ -48,6 +48,13 @@ export type MultimodalServiceConfig = {
   healthPath?: string;
 };
 
+export type SystemMetricsConfig = {
+  /** Enable system metrics collection (default: false). */
+  enabled?: boolean;
+  /** How often to collect metrics in seconds (default: 10). */
+  intervalSeconds?: number;
+};
+
 export type InfrastructureConfig = {
   /** SSH tunnel endpoints to monitor for connectivity. */
   tunnels?: SshTunnelMonitorConfig[];
@@ -57,4 +64,6 @@ export type InfrastructureConfig = {
   localGpu?: LocalGpuConfig;
   /** Multimodal service endpoints to monitor for health. */
   multimodal?: MultimodalServiceConfig[];
+  /** System metrics (CPU, RAM, network) for the gateway host. */
+  systemMetrics?: SystemMetricsConfig;
 };

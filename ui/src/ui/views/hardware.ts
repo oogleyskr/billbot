@@ -6,6 +6,8 @@ import type {
   ProviderHealthStatus,
   MultimodalServiceStatus,
   TunnelResult,
+  SystemMetricsSnapshot,
+  InferenceSpeedSnapshot,
 } from "../controllers/hardware.ts";
 
 export type HardwareProps = {
@@ -83,7 +85,11 @@ function gpuStatus(gpu: GpuMetricsSnapshot): "ok" | "degraded" | "error" {
   return "ok";
 }
 
-function renderGpuCard(title: string, gpu: GpuMetricsSnapshot | undefined) {
+function renderGpuCard(
+  title: string,
+  gpu: GpuMetricsSnapshot | undefined,
+  speed?: InferenceSpeedSnapshot,
+) {
   if (!gpu) {
     return html`
       <div class="card">
@@ -120,6 +126,7 @@ function renderGpuCard(title: string, gpu: GpuMetricsSnapshot | undefined) {
         ${progressBar(g.memoryUsedMB ?? 0, g.memoryTotalMB ?? 1, `VRAM ${g.memoryUsedMB ?? 0} / ${g.memoryTotalMB ?? 0} MB`)}
         ${g.powerDrawWatts != null && g.powerLimitWatts != null ? progressBar(g.powerDrawWatts, g.powerLimitWatts, `Power ${g.powerDrawWatts.toFixed(0)} / ${g.powerLimitWatts.toFixed(0)} W`) : g.powerDrawWatts != null ? metric("Power Draw", `${g.powerDrawWatts.toFixed(0)}`, " W") : nothing}
         ${metric("Temperature", g.temperatureCelsius, "\u00b0C")}
+        ${speed ? metric("Speed", `${speed.tokensPerSecond} tok/s (avg ${speed.averageTokPerSec})`) : nothing}
       </div>
       <div class="muted" style="font-size: 0.8em; margin-top: 8px;">
         Collected ${formatAge(Date.now() - gpu.collectedAt)}
@@ -297,6 +304,47 @@ function renderMultimodalCard(infra: InfrastructureData) {
   `;
 }
 
+function formatKBps(kbps: number | undefined): string {
+  if (kbps == null) {
+    return "n/a";
+  }
+  if (kbps >= 1024) {
+    return `${(kbps / 1024).toFixed(1)} MB/s`;
+  }
+  return `${kbps} KB/s`;
+}
+
+function renderSystemMetricsCard(sys: SystemMetricsSnapshot | undefined) {
+  if (!sys) {
+    return nothing;
+  }
+
+  const cpuStatus: "ok" | "degraded" | "error" = sys.error
+    ? "error"
+    : (sys.cpuUsagePercent ?? 0) > 90
+      ? "degraded"
+      : "ok";
+
+  return html`
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="card-title">System</div>
+        ${statusChip(cpuStatus)}
+      </div>
+      <div style="margin-top: 12px;">
+        ${sys.cpuUsagePercent != null ? progressBar(sys.cpuUsagePercent, 100, "CPU Usage") : metric("CPU Usage", undefined)}
+        ${sys.cpuTemperatureCelsius != null ? metric("CPU Temp", sys.cpuTemperatureCelsius, "\u00b0C") : nothing}
+        ${sys.ramUsedMB != null && sys.ramTotalMB != null ? progressBar(sys.ramUsedMB, sys.ramTotalMB, `RAM ${Math.round((sys.ramUsedMB / 1024) * 10) / 10} / ${Math.round((sys.ramTotalMB / 1024) * 10) / 10} GB`) : metric("RAM", undefined)}
+        ${metric("Net In", formatKBps(sys.networkInKBps))}
+        ${metric("Net Out", formatKBps(sys.networkOutKBps))}
+      </div>
+      <div class="muted" style="font-size: 0.8em; margin-top: 8px;">
+        Collected ${formatAge(Date.now() - sys.collectedAt)}
+      </div>
+    </div>
+  `;
+}
+
 export function renderHardware(props: HardwareProps) {
   return html`
     <section>
@@ -320,7 +368,8 @@ export function renderHardware(props: HardwareProps) {
         props.infra
           ? html`
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px;">
-          ${renderGpuCard("DGX Spark GPU", props.infra.gpu)}
+          ${renderSystemMetricsCard(props.infra.systemMetrics)}
+          ${renderGpuCard("DGX Spark GPU", props.infra.gpu, props.infra.inferenceSpeed)}
           ${renderGpuCard("Local GPU", props.infra.localGpu)}
           ${renderProviderCard(props.infra)}
           ${renderGatewayCard(props.health)}

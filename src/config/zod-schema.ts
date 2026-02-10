@@ -565,6 +565,13 @@ export const OpenClawSchema = z
               .strict(),
           )
           .optional(),
+        systemMetrics: z
+          .object({
+            enabled: z.boolean().optional(),
+            intervalSeconds: z.number().int().positive().optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),

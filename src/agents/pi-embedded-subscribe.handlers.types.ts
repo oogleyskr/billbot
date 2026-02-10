@@ -61,6 +61,9 @@ export type EmbeddedPiSubscribeState = {
   messagingToolSentTargets: MessagingToolSend[];
   pendingMessagingTexts: Map<string, string>;
   pendingMessagingTargets: Map<string, MessagingToolSend>;
+
+  /** Timestamp when the current assistant message started (for tok/s). */
+  assistantMessageStartedAt?: number;
 };
 
 export type EmbeddedPiSubscribeContext = {
