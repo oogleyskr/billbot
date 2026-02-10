@@ -1,0 +1,243 @@
+#!/bin/bash
+# dnd5e-dm CLI - Dungeon Mastering Best Practices
+
+set -e
+
+usage() {
+    cat <<EOF
+D&D 5e Dungeon Mastering CLI
+
+Usage: dnd5e-dm <command> [options]
+
+Commands:
+  adventure <type>     Adventure design tips (one-shot, campaign, sandbox)
+  encounter <type>     Encounter design tips (combat, social, exploration)
+  boss <challenge>     Boss fight design (easy, medium, hard, legendary)
+  table <tip-type>     Table management tips (rules, pacing, players)
+  help                 Show this help message
+
+Examples:
+  dnd5e-dm adventure campaign
+  dnd5e-dm encounter social
+  dnd5e-dm boss legendary
+  dnd5e-dm table pacing
+
+Available tip types:
+- rules: DM rules and rulings
+- pacing: Session pacing and timing
+- players: Managing different player types
+- combat: Combat management tips
+- NPC: NPC creation and roleplaying
+- world: Worldbuilding tips
+EOF
+}
+
+adventure_tips() {
+    local type="$1"
+    case "$(echo "$type" | tr '[:upper:]' '[:lower:]')" in
+        "one-shot")
+            echo "One-Shot Adventure Design:"
+            echo "  - Keep it simple: 1 location, 1-2 encounters, 1 NPC faction"
+            echo "  - Clear goal: What must players do to succeed?"
+            echo "  - Quick setup: 5-10 minutes of intro, then jump in"
+            echo "  - High stakes: Make consequences feel real"
+            echo "  - Clear exit: What happens if they succeed/fail?"
+            ;;
+        "campaign")
+            echo "Campaign Design:"
+            echo "  - Central conflict: What's the main problem?"
+            echo "  - Three-act structure: Hook, rising action, climax"
+            echo "  - Player agency: Don't dictate how they solve problems"
+            echo "  - Long-term goals: Give players things to work toward"
+            echo "  - Reusable elements: Create locations/NPCs for multiple sessions"
+            echo "  - Pacing: Mix easy/hard encounters, combat/social/exploration"
+            ;;
+        "sandbox")
+            echo "Sandbox Adventure Design:"
+            echo "  - Multiple locations: 3-5 key areas to explore"
+            echo "  - NPC factions: Multiple groups with conflicting goals"
+            echo "  - Random encounters: Tables for each region"
+            echo "  - Player-driven: Let them choose where to go"
+            echo "  - Cause and effect: World reacts to their actions"
+            echo "  - Hook table: Multiple entry points into the story"
+            ;;
+        *)
+            echo "Adventure types: one-shot, campaign, sandbox"
+            ;;
+    esac
+}
+
+encounter_tips() {
+    local type="$1"
+    case "$(echo "$type" | tr '[:upper:]' '[:lower:]')" in
+        "combat")
+            echo "Combat Encounter Tips:"
+            echo "  - Mix monster types: Brutes, skirmishers, soldiers, controllers, artillery"
+            echo "  - Interesting terrain: Cover, obstacles, hazards"
+            echo "  - Minions: Use for flavor, not main threat"
+            echo "  - Bosses: Add minions, legendary actions, terrain changes"
+            echo "  - Outcomes: Not just kill - surrender, flee, negotiate"
+            echo "  - Adjust on fly: HP, damage, add/remove monsters"
+            ;;
+        "social")
+            echo "Social Encounter Tips:"
+            echo "  - Clear goals: What do NPCs want? What do PCs want?"
+            echo "  - Multiple approaches: Persuasion, intimidation, deception"
+            echo "  - NPC personalities: Give them quirks and motivations"
+            echo "  - consequences: NPCs remember what you do to them"
+            echo "  - Roleplay rewards: Bonus dice, info, help for good RP"
+            echo "  - Time pressure: Give urgency to social interactions"
+            ;;
+        "exploration")
+            echo "Exploration Encounter Tips:"
+            echo "  - Sensory details: Describe sights, sounds, smells"
+            echo "  - Clues and puzzles: Give players things to figure out"
+            echo "  - Time limits: Create urgency"
+            echo "  - Environmental hazards: Weather, terrain, traps"
+            echo "  - Resource management: Track food, water, light"
+            echo "  - Navigation challenges: Maps, landmarks, getting lost"
+            ;;
+        *)
+            echo "Encounter types: combat, social, exploration"
+            ;;
+    esac
+}
+
+boss_tips() {
+    local challenge="$1"
+    case "$(echo "$challenge" | tr '[:upper:]' '[:lower:]')" in
+        "easy")
+            echo "Easy Boss (CR 1-3):"
+            echo "  - 1 creature, CR 1-3"
+            echo "  - 1-2 simple abilities"
+            echo "  - No legendary actions"
+            echo "  - Simple lair (1-2 features)"
+            echo "  - 1-2 minions for flavor"
+            echo "  - 1-2 rounds of combat"
+            ;;
+        "medium")
+            echo "Medium Boss (CR 5-10):"
+            echo "  - 1 creature, CR 5-10"
+            echo "  - 3-4 abilities, including one big finisher"
+            echo "  - 1 legendary action"
+            echo "  - 2-3 lair features"
+            echo "  - 3-4 minions or traps"
+            echo "  - 3-5 rounds of combat"
+            ;;
+        "hard")
+            echo "Hard Boss (CR 11-16):"
+            echo "  - 1 creature, CR 11-16"
+            echo "  - 5+ abilities, multiple phases"
+            echo "  - 3 legendary actions per round"
+            echo "  - 4-5 lair features that change combat"
+            echo "  - 5-6 minions or complex traps"
+            echo "  - 5-7 rounds of combat"
+            echo "  - Phase change at 50% HP"
+            ;;
+        "legendary")
+            echo "Legendary Boss (CR 17+):"
+            echo "  - 1 creature, CR 17+"
+            echo "  - 8+ abilities, multiple phases with transformation"
+            echo "  - 3 legendary actions per round"
+            echo "  - 6+ lair features that evolve during fight"
+            echo "  - 7+ minions with unique roles"
+            echo "  - 7+ rounds of combat"
+            echo "  - Phase changes at 75%, 50%, 25% HP"
+            echo "  - Lair becomes active during fight"
+            echo "  - Environmental storytelling in boss lair"
+            ;;
+        *)
+            echo "Boss challenges: easy, medium, hard, legendary"
+            ;;
+    esac
+}
+
+table_tips() {
+    local tip="$1"
+    case "$(echo "$tip" | tr '[:upper:]' '[:lower:]')" in
+        "rules")
+            echo "DM Rules Tips:"
+            echo "  - Rule 0: DM makes rulings, checks rules later"
+            echo "  - Don't memorize rules: Know where to find them"
+            echo "  - Be consistent: Same ruling for same situation"
+            echo "  - Explain rulings: Why you decided what you did"
+            echo "  - Player input: Ask how they want to approach problems"
+            echo "  - Table agreement: Rules should be fun for everyone"
+            ;;
+        "pacing")
+            echo "Session Pacing Tips:"
+            echo "  - 4-hour session structure:"
+            echo "    - 15 min: Intro and recap"
+            echo "    - 60 min: First encounter/story beat"
+            echo "    - 15 min: Break"
+            echo "    - 60 min: Second encounter/story beat"
+            echo "    - 60 min: Climax/boss fight"
+            echo "    - 15 min: Wrap-up and next session preview"
+            echo "  - Combat: 45-60 min total for 2-3 fights"
+            echo "  - Social: 15-30 min per important NPC"
+            echo "  - Exploration: 15-45 min depending on complexity"
+            echo "  - Watch for fatigue: Switch activities if players lose focus"
+            ;;
+        "players")
+            echo "Player Management Tips:"
+            echo "  - Know your players: What do they enjoy?"
+            echo "  - Give everyone spotlight time"
+            echo "  - Handle rules-lawyers: 'Let's check the rules together'"
+            echo "  - New players: Be patient, explain concepts simply"
+            echo "  - Disruptive players: Address privately, set boundaries"
+            echo "  - Encourage RP: Reward good roleplay with bonuses"
+            ;;
+        "combat")
+            echo "Combat Management Tips:"
+            echo "  - Use initiative order: Write it down or use tokens"
+            echo "  - Describe actions: What the monster does"
+            echo "  - Keep it moving: Limit player decision time"
+            echo "  - Use minions: For flavor, not main threat"
+            echo "  - Adjust difficulty: HP, damage, add/remove monsters"
+            echo "  - End fights: Surrender, flee, negotiate options"
+            ;;
+        "npc")
+            echo "NPC Tips:"
+            echo "  - Give them names: Even minor NPCs"
+            echo "  - Quirks and habits: What makes them unique?"
+            echo "  - Motivations: What do they want?"
+            echo "  - Memory: NPCs remember PC actions"
+            echo "  - Voice/posture: Different ways to sound different"
+            echo "  - Recurring NPCs: Bring them back later"
+            ;;
+        "world")
+            echo "Worldbuilding Tips:"
+            echo "  - Start small: 1 town, 1 region"
+            echo "  - Cause and effect: World reacts to PC actions"
+            echo "  - Reusable elements: Locations, NPCs, factions"
+            echo "  - Handwavium: Don't know everything? Make it up"
+            echo "  - PC-driven: World expands as they explore"
+            echo "  - Consistency: Keep notes on what you invent"
+            ;;
+        *)
+            echo "Table tip types: rules, pacing, players, combat, npc, world"
+            ;;
+    esac
+}
+
+# Main command handler
+case "$1" in
+    adventure)
+        adventure_tips "$2"
+        ;;
+    encounter)
+        encounter_tips "$2"
+        ;;
+    boss)
+        boss_tips "$2"
+        ;;
+    table)
+        table_tips "$2"
+        ;;
+    help|--help|-h|"")
+        usage
+        ;;
+    *)
+        usage
+        ;;
+esac

@@ -1,0 +1,440 @@
+#!/bin/bash
+# dnd5e CLI - D&D 5e Rule Lookup
+
+set -e
+
+usage() {
+    cat <<EOF
+D&D 5e Rule Lookup Tool
+
+Usage: dnd5e <command> [options]
+
+Commands:
+  rule <name>        Look up a rule (combat, ability, skill, etc.)
+  class <name>       Look up a class and its features
+  race <name>        Look up a race and its traits
+  spell <name>       Look up a spell (basic info)
+  help               Show this help message
+
+Examples:
+  dnd5e rule "advantage and disadvantage"
+  dnd5e class wizard
+  dnd5e race elf
+  dnd5e spell fireball
+
+Rules include:
+- ability scores (STR, DEX, CON, INT, WIS, CHA)
+- skills (athletics, acrobatics, stealth, etc.)
+- combat actions (attack, cast spell, dash, etc.)
+- combat bonus actions
+- combat reactions
+- saving throws
+- proficiency bonus by level
+- spell slots by level
+
+Classes:
+- fighter, wizard, cleric, rogue, monk, paladin, ranger, warlock, sorcerer, druid
+
+Races:
+- human, elf, dwarf, halfling, dragonborn, gnome, half-elf, half-orc, tiefling
+EOF
+}
+
+rule_lookup() {
+    local rule="$1"
+    case "$(echo "$rule" | tr '[:upper:]' '[:lower:]')" in
+        *"advantage"*) 
+            echo "Advantage/Disadvantage:"
+            echo "  - Roll 2d20, take highest (advantage) or lowest (disadvantage)"
+            echo "  - Sources: conditions, spells, class features"
+            ;;
+        *"combat"*)
+            echo "Combat Turn Order:"
+            echo "  1. Establish surroundings"
+            echo "  2. Determine initiative (1d20 + DEX)"
+            echo "  3. Each turn:"
+            echo "     - Move (up to speed)"
+            echo "     - Action (Attack, Cast Spell, Dash, etc.)"
+            echo "     - Bonus Action (if feature)"
+            echo "     - Reaction (if trigger)"
+            ;;
+        *"action"*)
+            echo "Combat Actions:"
+            echo "  - Attack: Make one weapon attack"
+            echo "  - Cast a Spell: Cast spell with 1 action casting time"
+            echo "  - Dash: Double movement speed"
+            echo "  - Disengage: Move without provoking opportunity attacks"
+            echo "  - Dodge: Advantage on DEX saves, attackers have disadvantage"
+            echo "  - Help: Grant advantage on check/attack against target within 5ft"
+            echo "  - Hide: Make Stealth check"
+            echo "  - Ready: Pre-action with specific trigger"
+            echo "  - Search: Search area, gain advantage on Perception"
+            echo "  - Use an Object: Interact with non-weapon object"
+            ;;
+        *"bonus"*)
+            echo "Bonus Actions (class-specific):"
+            echo "  - Rogue (Cunning Action): Move, dash, disengage, or hide"
+            echo "  - Many classes grant bonus actions for specific abilities"
+            ;;
+        *"reaction"*)
+            echo "Reactions:"
+            echo "  - Opportunity Attack: When enemy leaves reach"
+            echo "  - Counterspell: When enemy casts spell within 60ft"
+            echo "  - Shield: +5 AC until start of next turn"
+            echo "  - Ready Action: When trigger occurs"
+            ;;
+        *"saving"*) 
+            echo "Saving Throws:"
+            echo "  - STR Save: Resist physical effects"
+            echo "  - DEX Save: Dodge area effects, avoid traps"
+            echo "  - CON Save: Resist poison/disease, hold breath"
+            echo "  - INT Save: Resist mental effects"
+            echo "  - WIS Save: Resist charm, fear, illusion"
+            echo "  - CHA Save: Resist possession, mind control"
+            ;;
+        *"proficiency"*)
+            echo "Proficiency Bonus by Level:"
+            echo "  1-4:  +2"
+            echo "  5-8:  +3"
+            echo "  9-12: +4"
+            echo "  13-16: +5"
+            echo "  17-20: +6"
+            ;;
+        *"spell"*)
+            echo "Spell Slots by Level:"
+            echo "  1: 2 slots"
+            echo "  2: 3 slots"
+            echo "  3: 4 slots, 2 2nd-level"
+            echo "  4: 4 slots, 3 2nd-level"
+            echo "  5: 4 slots, 3 2nd-level, 2 3rd-level"
+            echo "  ... continues through level 20"
+            ;;
+        *"initiative"*)
+            echo "Initiative:"
+            echo "  - Roll 1d20 + DEX modifier"
+            echo "  - Highest to lowest order"
+            echo "  - Tie: DM decides or roll again"
+            echo "  - Hidden creatures: roll separately, reveal when attacking"
+            ;;
+        *"ac"*)
+            echo "Armor Class (AC):"
+            echo "  - Base: 10 + DEX modifier"
+            echo "  - With armor: Use armor's AC (max DEX bonus if applies)"
+            echo "  - Unarmored: 10 + relevant modifier"
+            echo "  - Shield: +2 AC (if not already wearing armor)"
+            ;;
+        *"hit"*)
+            echo "Hit Points (HP):"
+            echo "  - Roll class die at 1st level"
+            echo "  - For higher levels: roll or use max (class die + CON modifier)"
+            echo "  - Current HP: How much damage you can take"
+            echo "  - Maximum HP: Class max + CON upgrades"
+            echo "  - Temporary HP: Shield, rage, etc. (added to current, not max)"
+            ;;
+        *"death"*)
+            echo "Death Saves:"
+            echo "  - At 0 HP: Make death saving throws"
+            echo "  - Roll 1d20:"
+            echo "    - 10+: Success (1 success)"
+            echo "    - 9-: Failure (1 failure)"
+            echo "    - 1: Two failures"
+            echo "    - 20: Regain 1 HP"
+            echo "  - 3 successes: Stable ( unconscious, 1 HP)"
+            echo "  - 3 failures: Death"
+            echo "  - Any damage at 0 HP: Failure (2 if source is 1d4+)"
+            ;;
+        *"ability"*)
+            echo "Ability Scores:"
+            echo "  STR: Strength - Physical power, melee attacks, carrying capacity"
+            echo "  DEX: Dexterity - Agility, reflexes, ranged attacks, AC"
+            echo "  CON: Constitution - Endurance, hit points, poison resistance"
+            echo "  INT: Intelligence - Reasoning, arcana, history, investigation"
+            echo "  WIS: Wisdom - Perception, insight, intuition, survival"
+            echo "  CHA: Charisma - Persuasion, leadership, deception, intimidation"
+            ;;
+        *)
+            echo "Rule not found: $rule"
+            echo "Try: dnd5e help"
+            ;;
+    esac
+}
+
+class_lookup() {
+    local class="$1"
+    case "$(echo "$class" | tr '[:upper:]' '[:lower:]')" in
+        "fighter")
+            echo "Fighter Features:"
+            echo "  - Fighting Style: Choose (Archery, Defense, Dueling, Great Weapon Fighting, Protection, Two-Weapon Fighting)"
+            echo "  - Second Wind: Bonus action to heal 1d10 + fighter level HP"
+            echo "  - Action Surge: Take 2 actions on 1 turn (2x at 17th level)"
+            echo "  - Martial Arts: Use unarmed strikes, gain bonus action attack"
+            echo "  - Extra Attack: Additional attacks as level increases"
+            echo "  - Indomitable: Reroll failed saving throws (3x at 19th level)"
+            ;;
+        "wizard")
+            echo "Wizard Features:"
+            echo "  - Arcane Recovery: Recover spell slots equal to half wizard level after short rest"
+            echo "  - Spellbook: Record spells, copy from scrolls/other sources"
+            echo "  - Arcane Tradition: Choose school (Abjuration, Conjuration, Divination, etc.)"
+            echo "  - Spell School Features: Gain unique abilities at 2nd, 6th, 10th, 14th levels"
+            ;;
+        "cleric")
+            echo "Cleric Features:"
+            echo "  - Divine Domain: Choose domain (Knowledge, Life, Light, Nature, Tempest, Trickery, War)"
+            echo "  - Channel Divinity: Turn undead, destroy undead, or domain-specific effect"
+            echo "  - Divine Domain Features: Gain unique abilities at 2nd, 6th, 8th, 17th levels"
+            echo "  - Destroy Undead: Destroy undead of specified CR based on cleric level"
+            ;;
+        "rogue")
+            echo "Rogue Features:"
+            echo "  - Expertise: Double proficiency bonus for two skills"
+            echo "  - Sneak Attack: 1d6 damage once per turn when advantage or ally within 5ft"
+            echo "  - Thieves' Cant: Secret language of rogues"
+            echo "  - Cunning Action: Bonus action to move, dash, disengage, or hide"
+            echo "  - Uncanny Dodge: Reduce damage from attack by half (reaction)"
+            echo "  - Evasion: Take half damage from area effects (DEX save)"
+            echo "  - Reliable Talent: Never roll below 10 on ability checks with proficiency"
+            echo "  - Blindsense: Locate creatures within 30ft if not invisible"
+            echo "  - Slippery Mind: Advantage on WIS saves (reaction)"
+            echo "  - Relentless: Gain 1 HP when reduced to 0 (once per long rest)"
+            echo "  - Stroke of Luck: Turn a failure into a success (twice per long rest)"
+            ;;
+        "monk")
+            echo "Monk Features:"
+            echo "  - Unarmored Defense: AC = 10 + DEX + WIS while not wearing armor"
+            echo "  - Martial Arts: Unarmed strike as bonus action, +1d4 damage"
+            echo "  - Ki: Spend ki points for special abilities"
+            echo "  - Unarmored Movement: Extra movement speed"
+            echo "  - Deflect Missiles: Catch or deflect missiles (reaction)"
+            echo "  - Slow Fall: Reduce falling damage"
+            echo "  - Evasion: Take half damage from area effects (DEX save)"
+            echo "  - Stillness of Mind: End charm/fear effects (bonus action)"
+            echo "  - Unarmored Movement: Extra movement speed"
+            echo "  - Diamond Soul: Advantage on all saves (CON modifier to all)"
+            echo "  - Timeless Body: No aging effects, immunity to disease"
+            echo "  - Empty Body: Become invisible and take 0 damage (4 ki points)"
+            echo "  - Perfect Self: Max ki points, no penalty for using ki"
+            ;;
+        "paladin")
+            echo "Paladin Features:"
+            echo "  - Divine Sense: Detect celestial/planar/undead/evil creatures (5 min/day)"
+            echo "  - Lay on Hands: Pool of HP to heal or cure disease/poison (50 + paladin level)"
+            echo "  - Fighting Style: Choose (Defense, Dueling, Great Weapon Fighting, Protection)"
+            echo "  - Divine Smite: Spend spell slot to deal radiant damage on melee hit"
+            echo "  - Fighting Style: Choose (Defense, Dueling, Great Weapon Fighting, Protection)"
+            echo "  - Aura of Protection: Allies within 10ft get CHA bonus to saves"
+            echo "  - Aura of Courage: Allies within 10ft immune to frightened"
+            echo "  - Cleanse Through Suffering: Turn damage to self into healing for allies"
+            echo "  - Destroy Undead: Destroy undead of specified CR based on paladin level"
+            echo "  - Immortal Soul: Resilience against death"
+            echo "  - Holy Nimbus: Emit radiant light, deal damage to undead (3 min/day)"
+            echo "  - Avatar of Blood: Deal extra damage on melee attacks (1 min/day)"
+            ;;
+        "ranger")
+            echo "Ranger Features:"
+            echo "  - Favored Enemy: Choose enemy type, gain advantage on related checks"
+            echo "  - Natural Explorer: Choose terrain, gain advantage on navigation/finding food/water"
+            echo "  - Fighting Style: Choose (Archery, Defense, Dueling, Two-Weapon Fighting)"
+            echo "  - Primeval Awareness: Detect creatures in favored terrain (1 hour/day)"
+            echo "  - Ranger Conclave: Choose conclave (Beast Master, Hunter, etc.)"
+            echo "  - Beast Master: Companion animal that fights with you"
+            echo "  - Hunter Conclave: Choose hunting tactic (Colossus Slayer, Gloom Stalker, etc.)"
+            echo "  - Natural Explorer: Gain advantage on navigation, find food/water"
+            echo "  - Hide in Plain Sight: Become invisible in natural terrain"
+            echo "  - Vanish: Disengage, dash, and hide as bonus action (1 rest/day)"
+            echo "  - Feral Senses: Advantage on Perception checks, can't be blinded/hidden"
+            echo "  - Shadow Walk: Teleport short distance (1 rest/day)"
+            echo "  - Master Hunter: Gain additional ranger features"
+            ;;
+        "warlock")
+            echo "Warlock Features:"
+            echo "  - Pact Magic: Spell slots recharge on short rest"
+            echo "  - Eldritch Invocations: Custom spell-like abilities"
+            echo "  - Pact Boon: Pact Weapon, Pact Tome, or Pact Bond (familiar/polar bear)"
+            echo "  - Eldritch Spirit: Extend pact weapon duration"
+            echo "  - Otherworldly Patron: Choose patron (The Archfey, The Fiend, The Great Old One)"
+            echo "  - Patron Features: Gain unique abilities at 6th, 10th, 14th levels"
+            echo "  - Mystic Arcanum: Cast high-level spells once per long rest"
+            echo "  - Eldritch Master: Hide spellcasting from detect magic"
+            echo "  - One with Shadows: Become invisible in dim light or darkness"
+            echo "  - Sign of Ill Omen: Force enemy to reroll attack rolls (1 rest/day)"
+            echo "  - Master of Myriad Forms: Change shape (3 rest/day)"
+            echo "  - Archfey Patron: Misty Escape, Beguiling Defenses"
+            echo "  - Fiend Patron: Dark One's Blessing, Dark One's Own Luck"
+            echo "  - Great Old One Patron: Awakened Mind, Thought Shield"
+            ;;
+        "sorcerer")
+            echo "Sorcerer Features:"
+            echo "  - Sorcerous Origin: Choose origin (Draconic, Wild Magic, Shadow, Storm, etc.)"
+            echo "  - Font of Magic: Convert spell slots to sorcery points and vice versa"
+            echo "  - Metamagic: Modify spells with special effects"
+            echo "  - Draconic Resilience: Hit points = 8 + CON modifier at 1st level"
+            echo "  - Sorcery Points: Manage spell slots as points"
+            echo "  - Flexible Casting: Create spell slots from sorcery points"
+            echo "  - Metamagic: Choose metamagic options"
+            echo "  - Sorcerous Origin Features: Gain unique abilities at 6th, 14th, 18th levels"
+            echo "  - Dragon Soul: Resist dragon type damage, gain breath weapon"
+            echo "  - Wild Magic: Wild Magic Surge, Tides of Chaos"
+            echo "  - Shadow Magic: Shadows of Moil, Faceless"
+            echo "  - Storm Magic: Stormy Presence, Wind Walker"
+            ;;
+        "druid")
+            echo "Druid Features:"
+            echo "  - Druidic: Secret language of druids"
+            echo "  - Wild Shape: Transform into beasts (2x/day at 2nd level)"
+            echo "  - Circle Forms: Choose circle (Land, Moon, etc.)"
+            echo "  - Circle Features: Gain unique abilities at 2nd, 6th, 10th, 14th levels"
+            echo "  - Beast Spells: Cast spells while in wild shape"
+            echo "  - Timeless Body: No aging effects, immunity to disease"
+            echo "  - Forest Walk: Move through non-magical forest without leaving tracks"
+            echo "  - Hide in Plain Sight: Become invisible in natural terrain"
+            echo "  - Master of Shapes: Wild shape into any beast (1 rest/day)"
+            echo "  - Circle of the Moon: More wild shape uses, higher CR beasts"
+            echo "  - Circle of the Land: Bonus cantrips, natural magic"
+            echo "  - Dampen Life: Reduce perception checks against you"
+            echo "  - Circle Forms: More wild shape uses, higher CR beasts"
+            ;;
+        *)
+            echo "Class not found: $class"
+            echo "Available classes: fighter, wizard, cleric, rogue, monk, paladin, ranger, warlock, sorcerer, druid"
+            ;;
+    esac
+}
+
+race_lookup() {
+    local race="$1"
+    case "$(echo "$race" | tr '[:upper:]' '[:lower:]')" in
+        "human")
+            echo "Human Features:"
+            echo "  - Ability Score: +1 to all six abilities"
+            echo "  - Speed: 30ft"
+            echo "  - Languages: Common + 1 extra"
+            echo "  - Skills: Gain proficiency in one skill of your choice"
+            echo "  - Feat: Gain one feat at 1st level"
+            ;;
+        "elf")
+            echo "Elf Features:"
+            echo "  - Ability Score: +2 Dexterity"
+            echo "  - Speed: 30ft"
+            echo "  - Darkvision: 60ft"
+            echo "  - Fey Ancestry: Advantage on CHA saves vs. charm"
+            echo "  - Trance: Meditate 4 hours instead of sleeping"
+            echo "  - Languages: Common, Elvish"
+            echo "  - Proficiency: Advantage on Perception checks"
+            echo "  - Weapon Proficiency: Proficient with longsword, shortsword, shortbow, longbow"
+            ;;
+        "dwarf")
+            echo "Dwarf Features:"
+            echo "  - Ability Score: +2 Constitution"
+            echo "  - Speed: 25ft"
+            echo "  - Darkvision: 60ft"
+            echo "  - Dwarven Resilience: Advantage on CON saves vs. poison, resistance to poison damage"
+            echo "  - Dwarven Training: Proficient with axe, hammer, light hammer"
+            echo "  - Languages: Common, Dwarvish"
+            echo "  - Stonecunning: Double proficiency bonus for history checks about stone"
+            echo "  - Tool Proficiency: Proficient with one type of artisan's tools"
+            ;;
+        "halfling")
+            echo "Halfling Features:"
+            echo "  - Ability Score: +2 Dexterity"
+            echo "  - Speed: 25ft"
+            echo "  - Lucky: Reroll 1s on attack rolls, ability checks, saving throws"
+            echo "  - Brave: Advantage on saves vs. frightened"
+            echo "  - Halfling Nimbleness: Move through space of larger creatures"
+            echo "  - Languages: Common, Halfling"
+            echo "  - Proficiency: Advantage on Stealth checks"
+            echo "  - Skills: Gain proficiency in one skill of your choice"
+            ;;
+        "dragonborn")
+            echo "Dragonborn Features:"
+            echo "  - Ability Score: +2 Strength, +1 Charisma"
+            echo "  - Speed: 30ft"
+            echo "  - Draconic Ancestry: Choose dragon type (Black, Blue, Bronze, Copper, Gold, Green, Red, Silver, White)"
+            echo "  - Breath Weapon: 2d6 damage (save for half) recharge 5-6"
+            echo "  - Damage Resistance: Resistance to dragon ancestor type"
+            echo "  - Languages: Common, Draconic"
+            echo "  - Strength Bonus: +2 to Strength score"
+            echo "  - Charisma Bonus: +1 to Charisma score"
+            ;;
+        "gnome")
+            echo "Gnome Features:"
+            echo "  - Ability Score: +2 Intelligence"
+            echo "  - Speed: 25ft"
+            echo "  - Darkvision: 60ft"
+            echo "  - Gnome Cunning: Advantage on INT/WIS/CHA saves vs. magic"
+            echo "  - Languages: Common, Gnomish"
+            echo "  - Proficiency: Advantage on Intelligence (Investigation) checks"
+            echo "  - Tool Proficiency: Proficient with one type of artisan's tools"
+            echo "  - Small Size: Medium creatures have disadvantage on attack rolls against you"
+            ;;
+        "half-elf")
+            echo "Half-Elf Features:"
+            echo "  - Ability Score: +2 Charisma, +1 to two others"
+            echo "  - Speed: 30ft"
+            echo "  - Darkvision: 60ft"
+            echo "  - Fey Ancestry: Advantage on CHA saves vs. charm"
+            echo "  - Skill Versatility: Proficient in two skills"
+            echo "  - Languages: Common, Elvish + 1 other"
+            echo "  - Charisma Bonus: +2 to Charisma score"
+            echo "  - Versatility: Choose two other abilities to gain +1"
+            ;;
+        "half-orc")
+            echo "Half-Orc Features:"
+            echo "  - Ability Score: +2 Strength, +1 Constitution"
+            echo "  - Speed: 30ft"
+            echo "  - Darkvision: 60ft"
+            echo "  - Savage Attacks: Roll max die on crits with melee weapons"
+            echo "  - Languages: Common, Orc"
+            echo "  - Strength Bonus: +2 to Strength score"
+            echo "  - Constitution Bonus: +1 to Constitution score"
+            echo "  - Relentless Endurance: Drop to 1 HP instead of 0 (1 rest/day)"
+            echo "  - Menacing: Proficient with Intimidation skill"
+            ;;
+        "tiefling")
+            echo "Tiefling Features:"
+            echo "  - Ability Score: +2 Charisma, +1 Intelligence"
+            echo "  - Speed: 30ft"
+            echo "  - Darkvision: 60ft"
+            echo "  - Hellish Resistance: Resistance to fire damage"
+            echo "  - Infernal Legacy: Can cast detect magic, hellish rebuke, darkness"
+            echo "  - Languages: Common, Infernal"
+            echo "  - Charisma Bonus: +2 to Charisma score"
+            echo "  - Intelligence Bonus: +1 to Intelligence score"
+            echo "  - Hellish Rebuke: Can cast hellish rebuke once per day"
+            echo "  - Infernal Legacy: Can cast detect magic and darkness once per day each"
+            ;;
+        *)
+            echo "Race not found: $race"
+            echo "Available races: human, elf, dwarf, halfling, dragonborn, gnome, half-elf, half-orc, tiefling"
+            ;;
+    esac
+}
+
+spell_lookup() {
+    local spell="$1"
+    echo "Spell lookup for: $spell"
+    echo "Note: Full spell details require spellbook access"
+    echo "Try D&D Beyond (https://www.dndbeyond.com) for complete spell details"
+}
+
+# Main command handler
+case "$1" in
+    rule)
+        rule_lookup "$2"
+        ;;
+    class)
+        class_lookup "$2"
+        ;;
+    race)
+        race_lookup "$2"
+        ;;
+    spell)
+        spell_lookup "$2"
+        ;;
+    help|--help|-h|"")
+        usage
+        ;;
+    *)
+        usage
+        ;;
+esac
