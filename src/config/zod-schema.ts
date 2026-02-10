@@ -545,6 +545,25 @@ export const OpenClawSchema = z
           })
           .strict()
           .optional(),
+        localGpu: z
+          .object({
+            enabled: z.boolean().optional(),
+            intervalSeconds: z.number().int().positive().optional(),
+          })
+          .strict()
+          .optional(),
+        multimodal: z
+          .array(
+            z
+              .object({
+                label: z.string(),
+                host: z.string().optional(),
+                port: z.number().int().min(1).max(65535),
+                healthPath: z.string().optional(),
+              })
+              .strict(),
+          )
+          .optional(),
       })
       .strict()
       .optional(),

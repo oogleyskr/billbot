@@ -28,9 +28,31 @@ export type GpuMetricsConfig = {
   intervalSeconds?: number;
 };
 
+export type LocalGpuConfig = {
+  /** Enable local GPU metrics collection (default: false). */
+  enabled?: boolean;
+  /** How often to collect metrics in seconds (default: 30). */
+  intervalSeconds?: number;
+};
+
+export type MultimodalServiceConfig = {
+  /** Display label for this service (e.g. "STT", "Vision"). */
+  label: string;
+  /** Host to check health on (default: localhost). */
+  host?: string;
+  /** Port the service listens on. */
+  port: number;
+  /** Health endpoint path (default: /health). */
+  healthPath?: string;
+};
+
 export type InfrastructureConfig = {
   /** SSH tunnel endpoints to monitor for connectivity. */
   tunnels?: SshTunnelMonitorConfig[];
-  /** GPU metrics collection configuration. */
+  /** GPU metrics collection configuration (remote or primary GPU). */
   gpu?: GpuMetricsConfig;
+  /** Local GPU metrics collection (e.g. RTX 3090 alongside remote DGX). */
+  localGpu?: LocalGpuConfig;
+  /** Multimodal service endpoints to monitor for health. */
+  multimodal?: MultimodalServiceConfig[];
 };

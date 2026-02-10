@@ -298,6 +298,12 @@ export class OpenClawApp extends LitElement {
   @state() skillsBusyKey: string | null = null;
   @state() skillMessages: Record<string, SkillMessage> = {};
 
+  @state() hardwareLoading = false;
+  @state() hardwareInfra: unknown = null;
+  @state() hardwareHealth: unknown = null;
+  @state() hardwareError: string | null = null;
+  private hardwarePollInterval: number | null = null;
+
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
   @state() debugHealth: HealthSnapshot | null = null;

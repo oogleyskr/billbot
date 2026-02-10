@@ -1,5 +1,6 @@
 import type { OpenClawApp } from "./app.ts";
 import { loadDebug } from "./controllers/debug.ts";
+import { loadHardware } from "./controllers/hardware.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 
@@ -7,6 +8,7 @@ type PollingHost = {
   nodesPollInterval: number | null;
   logsPollInterval: number | null;
   debugPollInterval: number | null;
+  hardwarePollInterval: number | null;
   tab: string;
 };
 
@@ -66,4 +68,24 @@ export function stopDebugPolling(host: PollingHost) {
   }
   clearInterval(host.debugPollInterval);
   host.debugPollInterval = null;
+}
+
+export function startHardwarePolling(host: PollingHost) {
+  if (host.hardwarePollInterval != null) {
+    return;
+  }
+  host.hardwarePollInterval = window.setInterval(() => {
+    if (host.tab !== "hardware") {
+      return;
+    }
+    void loadHardware(host as unknown as OpenClawApp);
+  }, 10_000);
+}
+
+export function stopHardwarePolling(host: PollingHost) {
+  if (host.hardwarePollInterval == null) {
+    return;
+  }
+  clearInterval(host.hardwarePollInterval);
+  host.hardwarePollInterval = null;
 }

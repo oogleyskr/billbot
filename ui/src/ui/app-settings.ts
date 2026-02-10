@@ -6,6 +6,8 @@ import {
   stopLogsPolling,
   startDebugPolling,
   stopDebugPolling,
+  startHardwarePolling,
+  stopHardwarePolling,
 } from "./app-polling.ts";
 import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
@@ -17,6 +19,7 @@ import { loadCronJobs, loadCronStatus } from "./controllers/cron.ts";
 import { loadDebug } from "./controllers/debug.ts";
 import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
+import { loadHardware } from "./controllers/hardware.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
@@ -163,6 +166,11 @@ export function setTab(host: SettingsHost, next: Tab) {
   } else {
     stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
   }
+  if (next === "hardware") {
+    startHardwarePolling(host as unknown as Parameters<typeof startHardwarePolling>[0]);
+  } else {
+    stopHardwarePolling(host as unknown as Parameters<typeof stopHardwarePolling>[0]);
+  }
   void refreshActiveTab(host);
   syncUrlWithTab(host, next, false);
 }
@@ -234,6 +242,9 @@ export async function refreshActiveTab(host: SettingsHost) {
       host as unknown as Parameters<typeof scheduleChatScroll>[0],
       !host.chatHasAutoScrolled,
     );
+  }
+  if (host.tab === "hardware") {
+    await loadHardware(host as unknown as OpenClawApp);
   }
   if (host.tab === "config") {
     await loadConfigSchema(host as unknown as OpenClawApp);
@@ -361,6 +372,11 @@ export function setTabFromRoute(host: SettingsHost, next: Tab) {
     startDebugPolling(host as unknown as Parameters<typeof startDebugPolling>[0]);
   } else {
     stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
+  }
+  if (next === "hardware") {
+    startHardwarePolling(host as unknown as Parameters<typeof startHardwarePolling>[0]);
+  } else {
+    stopHardwarePolling(host as unknown as Parameters<typeof stopHardwarePolling>[0]);
   }
   if (host.connected) {
     void refreshActiveTab(host);

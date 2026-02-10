@@ -5,6 +5,7 @@ import {
   collectLocalGpuMetrics,
   collectRemoteGpuMetrics,
 } from "./gpu-metrics.js";
+import { type MultimodalHealthSnapshot, checkMultimodalHealth } from "./multimodal-health.js";
 import {
   type ProviderHealthSnapshot,
   checkAllProviders,
@@ -17,20 +18,26 @@ export type InfrastructureSnapshot = {
   providers?: ProviderHealthSnapshot;
   tunnels?: TunnelMonitorResult[];
   gpu?: GpuMetricsSnapshot;
+  localGpu?: GpuMetricsSnapshot;
+  multimodal?: MultimodalHealthSnapshot;
   collectedAt: number;
 };
 
 // Polling timers for each subsystem. `.unref()` prevents them from keeping
 // the Node process alive when the gateway is shutting down.
 let gpuInterval: ReturnType<typeof setInterval> | null = null;
+let localGpuInterval: ReturnType<typeof setInterval> | null = null;
 let tunnelInterval: ReturnType<typeof setInterval> | null = null;
 let providerInterval: ReturnType<typeof setInterval> | null = null;
+let multimodalInterval: ReturnType<typeof setInterval> | null = null;
 
 // Cached results from the most recent polling cycle. The gateway's RPC
 // handler reads these via getInfrastructureSnapshot() without triggering
 // new probes, so dashboard clients get fast responses.
 let cachedGpu: GpuMetricsSnapshot | null = null;
+let cachedLocalGpu: GpuMetricsSnapshot | null = null;
 let cachedTunnels: TunnelMonitorResult[] | null = null;
+let cachedMultimodal: MultimodalHealthSnapshot | null = null;
 
 /** Refresh GPU metrics from local or remote nvidia-smi and cache the result. */
 async function refreshGpuMetrics(infraCfg: InfrastructureConfig): Promise<void> {
@@ -49,6 +56,20 @@ async function refreshGpuMetrics(infraCfg: InfrastructureConfig): Promise<void> 
   } else {
     cachedGpu = await collectLocalGpuMetrics();
   }
+}
+
+/** Refresh local GPU metrics via nvidia-smi and cache the result. */
+async function refreshLocalGpuMetrics(): Promise<void> {
+  cachedLocalGpu = await collectLocalGpuMetrics();
+}
+
+/** Check all configured multimodal services and cache the results. */
+async function refreshMultimodal(infraCfg: InfrastructureConfig): Promise<void> {
+  const configs = infraCfg.multimodal;
+  if (!configs || configs.length === 0) {
+    return;
+  }
+  cachedMultimodal = await checkMultimodalHealth(configs);
 }
 
 /** Check all configured tunnels in parallel and cache the results. */
@@ -80,12 +101,14 @@ export function getInfrastructureSnapshot(): InfrastructureSnapshot {
     providers: getProviderHealthSnapshot(),
     tunnels: cachedTunnels ?? undefined,
     gpu: cachedGpu ?? undefined,
+    localGpu: cachedLocalGpu ?? undefined,
+    multimodal: cachedMultimodal ?? undefined,
     collectedAt: Date.now(),
   };
 }
 
 /**
- * Perform a full infrastructure probe (providers + tunnels + GPU).
+ * Perform a full infrastructure probe (providers + tunnels + GPU + local GPU + multimodal).
  */
 export async function probeInfrastructure(cfg: OpenClawConfig): Promise<InfrastructureSnapshot> {
   const infraCfg = cfg.infrastructure;
@@ -104,6 +127,16 @@ export async function probeInfrastructure(cfg: OpenClawConfig): Promise<Infrastr
     // GPU metrics
     if (infraCfg.gpu?.enabled) {
       tasks.push(refreshGpuMetrics(infraCfg));
+    }
+
+    // Local GPU metrics
+    if (infraCfg.localGpu?.enabled) {
+      tasks.push(refreshLocalGpuMetrics());
+    }
+
+    // Multimodal services
+    if (infraCfg.multimodal && infraCfg.multimodal.length > 0) {
+      tasks.push(refreshMultimodal(infraCfg));
     }
   }
 
@@ -157,6 +190,16 @@ export function startInfrastructureMonitor(cfg: OpenClawConfig): void {
     gpuInterval.unref();
   }
 
+  // Local GPU metrics
+  if (infraCfg.localGpu?.enabled) {
+    const localGpuIntervalSec = infraCfg.localGpu.intervalSeconds ?? 30;
+    void refreshLocalGpuMetrics();
+    localGpuInterval = setInterval(() => {
+      void refreshLocalGpuMetrics();
+    }, localGpuIntervalSec * 1000);
+    localGpuInterval.unref();
+  }
+
   // Tunnel monitoring (check every 30s)
   if (infraCfg.tunnels && infraCfg.tunnels.length > 0) {
     void refreshTunnels(infraCfg);
@@ -164,6 +207,15 @@ export function startInfrastructureMonitor(cfg: OpenClawConfig): void {
       void refreshTunnels(infraCfg);
     }, 30_000);
     tunnelInterval.unref();
+  }
+
+  // Multimodal service monitoring (check every 10s)
+  if (infraCfg.multimodal && infraCfg.multimodal.length > 0) {
+    void refreshMultimodal(infraCfg);
+    multimodalInterval = setInterval(() => {
+      void refreshMultimodal(infraCfg);
+    }, 10_000);
+    multimodalInterval.unref();
   }
 }
 
@@ -177,6 +229,10 @@ export function stopInfrastructureMonitor(): void {
     clearInterval(gpuInterval);
     gpuInterval = null;
   }
+  if (localGpuInterval) {
+    clearInterval(localGpuInterval);
+    localGpuInterval = null;
+  }
   if (tunnelInterval) {
     clearInterval(tunnelInterval);
     tunnelInterval = null;
@@ -185,7 +241,13 @@ export function stopInfrastructureMonitor(): void {
     clearInterval(providerInterval);
     providerInterval = null;
   }
+  if (multimodalInterval) {
+    clearInterval(multimodalInterval);
+    multimodalInterval = null;
+  }
 
   cachedGpu = null;
+  cachedLocalGpu = null;
   cachedTunnels = null;
+  cachedMultimodal = null;
 }

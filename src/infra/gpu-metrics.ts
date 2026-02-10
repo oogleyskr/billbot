@@ -72,6 +72,80 @@ function parseNvidiaSmiOutput(output: string): GpuMetrics[] {
 }
 
 /**
+ * For GPUs that don't report memory via --query-gpu (e.g. NVIDIA GB10),
+ * sum per-process GPU memory from --query-compute-apps.
+ */
+function parseProcessMemory(output: string): number {
+  let totalMB = 0;
+  for (const line of output.trim().split("\n")) {
+    const parts = line.split(",").map((s) => s.trim());
+    // Format: pid, name, used_gpu_memory
+    if (parts.length >= 3) {
+      const mem = parseFloat(parts[parts.length - 1].replace(/[^0-9.]/g, ""));
+      if (Number.isFinite(mem)) {
+        totalMB += mem;
+      }
+    }
+  }
+  return Math.round(totalMB);
+}
+
+/**
+ * Enrich GPU metrics that are missing memory data by querying per-process memory
+ * and system total memory. This handles GPUs like the GB10 with unified memory.
+ */
+async function enrichMissingMemory(
+  gpus: GpuMetrics[],
+  runCommand: (cmd: string) => Promise<string>,
+): Promise<void> {
+  const needsMemory = gpus.some((g) => g.memoryUsedMB === undefined);
+  if (!needsMemory) {
+    return;
+  }
+
+  try {
+    // Get per-process GPU memory usage
+    const processOutput = await runCommand(
+      "nvidia-smi --query-compute-apps=pid,name,used_gpu_memory --format=csv,noheader,nounits 2>/dev/null || true",
+    );
+    const processMemMB = parseProcessMemory(processOutput);
+
+    // Get total system memory as proxy for unified memory GPUs (in MB)
+    let totalMemMB: number | undefined;
+    try {
+      const memOutput = await runCommand(
+        "awk '/MemTotal/{printf \"%.0f\", $2/1024}' /proc/meminfo 2>/dev/null || true",
+      );
+      const parsed = parseInt(memOutput.trim(), 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        totalMemMB = parsed;
+      }
+    } catch {
+      // ignore
+    }
+
+    for (const gpu of gpus) {
+      if (gpu.memoryUsedMB === undefined && processMemMB > 0) {
+        gpu.memoryUsedMB = processMemMB;
+      }
+      if (gpu.memoryTotalMB === undefined && totalMemMB !== undefined) {
+        gpu.memoryTotalMB = totalMemMB;
+      }
+      if (
+        gpu.memoryUsedMB !== undefined &&
+        gpu.memoryTotalMB !== undefined &&
+        gpu.memoryTotalMB > 0 &&
+        gpu.memoryUtilizationPercent === undefined
+      ) {
+        gpu.memoryUtilizationPercent = Math.round((gpu.memoryUsedMB / gpu.memoryTotalMB) * 100);
+      }
+    }
+  } catch {
+    // Best-effort enrichment, don't fail the whole collection
+  }
+}
+
+/**
  * Collect GPU metrics from a local machine via nvidia-smi.
  */
 export async function collectLocalGpuMetrics(): Promise<GpuMetricsSnapshot> {
@@ -81,9 +155,15 @@ export async function collectLocalGpuMetrics(): Promise<GpuMetricsSnapshot> {
       { timeout: 10_000 },
     );
 
+    const gpus = parseNvidiaSmiOutput(stdout);
+    await enrichMissingMemory(gpus, async (cmd) => {
+      const result = await execAsync(cmd, { timeout: 5_000 });
+      return result.stdout;
+    });
+
     return {
       host: "localhost",
-      gpus: parseNvidiaSmiOutput(stdout),
+      gpus,
       collectedAt: Date.now(),
     };
   } catch (err) {
@@ -110,8 +190,8 @@ export async function collectRemoteGpuMetrics(params: {
   const nvidiaSmiCmd =
     "nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,memory.used,memory.total,power.draw,power.limit --format=csv,noheader,nounits";
 
-  // Build args array to avoid shell injection via config values
-  const sshArgs: string[] = [
+  // Build base SSH args (reused for enrichment queries)
+  const baseSshArgs: string[] = [
     "-o",
     "StrictHostKeyChecking=no",
     "-o",
@@ -120,19 +200,29 @@ export async function collectRemoteGpuMetrics(params: {
     "BatchMode=yes",
   ];
   if (params.sshKeyPath) {
-    sshArgs.push("-i", params.sshKeyPath);
+    baseSshArgs.push("-i", params.sshKeyPath);
   }
   if (params.sshPort) {
-    sshArgs.push("-p", String(params.sshPort));
+    baseSshArgs.push("-p", String(params.sshPort));
   }
-  sshArgs.push(userHost, nvidiaSmiCmd);
+
+  const sshArgs = [...baseSshArgs, userHost, nvidiaSmiCmd];
 
   try {
     const { stdout } = await execFileAsync("ssh", sshArgs, { timeout: 15_000 });
 
+    const gpus = parseNvidiaSmiOutput(stdout);
+
+    // Enrich missing memory data via additional SSH queries
+    await enrichMissingMemory(gpus, async (cmd) => {
+      const enrichArgs = [...baseSshArgs, userHost, cmd];
+      const result = await execFileAsync("ssh", enrichArgs, { timeout: 10_000 });
+      return result.stdout;
+    });
+
     return {
       host: params.sshHost,
-      gpus: parseNvidiaSmiOutput(stdout),
+      gpus,
       collectedAt: Date.now(),
     };
   } catch (err) {
