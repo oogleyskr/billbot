@@ -5,6 +5,7 @@ import type {
   GpuMetricsSnapshot,
   ProviderHealthStatus,
   MultimodalServiceStatus,
+  MemoryCortexSnapshot,
   TunnelResult,
   SystemMetricsSnapshot,
   InferenceSpeedSnapshot,
@@ -164,14 +165,14 @@ function renderLocalSystemCard(
   if (!hasGpu && !hasSys) {
     return html`
       <div class="card">
-        <div class="card-title">Local System</div>
+        <div class="card-title">NVIDIA RTX 3090 24GB</div>
         <div class="muted" style="margin-top: 8px">No data available.</div>
       </div>
     `;
   }
 
   const g = gpu?.gpus[0];
-  const gpuOk = hasGpu ? gpuStatus(gpu!) : "unknown";
+  const gpuOk = hasGpu ? gpuStatus(gpu) : "unknown";
   const cpuHigh = (sys?.cpuUsagePercent ?? 0) > 90;
   const overallStatus: "ok" | "degraded" | "error" =
     gpuOk === "error" || sys?.error ? "error" : gpuOk === "degraded" || cpuHigh ? "degraded" : "ok";
@@ -179,20 +180,20 @@ function renderLocalSystemCard(
   return html`
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div class="card-title">Local System</div>
+        <div class="card-title">NVIDIA RTX 3090 24GB</div>
         ${statusChip(overallStatus)}
       </div>
-      ${g ? html`<div class="card-sub">${g.name} (${gpu!.host})</div>` : nothing}
+      ${g ? html`<div class="card-sub">${g.name} (${gpu.host})</div>` : nothing}
       <div style="margin-top: 12px;">
-        ${hasSys && sys!.cpuUsagePercent != null ? progressBar(sys!.cpuUsagePercent, 100, "CPU Usage") : nothing}
-        ${hasSys && sys!.cpuTemperatureCelsius != null ? metric("CPU Temp", cToF(sys!.cpuTemperatureCelsius), "\u00b0F") : nothing}
-        ${hasSys && sys!.ramUsedMB != null && sys!.ramTotalMB != null ? progressBar(sys!.ramUsedMB, sys!.ramTotalMB, `RAM ${Math.round((sys!.ramUsedMB / 1024) * 10) / 10} / ${Math.round((sys!.ramTotalMB / 1024) * 10) / 10} GB`) : nothing}
+        ${hasSys && sys.cpuUsagePercent != null ? progressBar(sys.cpuUsagePercent, 100, "CPU Usage") : nothing}
+        ${hasSys && sys.cpuTemperatureCelsius != null ? metric("CPU Temp", cToF(sys.cpuTemperatureCelsius), "\u00b0F") : nothing}
+        ${hasSys && sys.ramUsedMB != null && sys.ramTotalMB != null ? progressBar(sys.ramUsedMB, sys.ramTotalMB, `RAM ${Math.round((sys.ramUsedMB / 1024) * 10) / 10} / ${Math.round((sys.ramTotalMB / 1024) * 10) / 10} GB`) : nothing}
         ${g ? progressBar(g.utilizationPercent ?? 0, 100, "GPU Utilization") : nothing}
         ${g ? progressBar(g.memoryUsedMB ?? 0, g.memoryTotalMB ?? 1, `VRAM ${g.memoryUsedMB ?? 0} / ${g.memoryTotalMB ?? 0} MB`) : nothing}
         ${g?.powerDrawWatts != null && g?.powerLimitWatts != null ? progressBar(g.powerDrawWatts, g.powerLimitWatts, `Power ${g.powerDrawWatts.toFixed(0)} / ${g.powerLimitWatts.toFixed(0)} W`) : g?.powerDrawWatts != null ? metric("Power Draw", `${g.powerDrawWatts.toFixed(0)}`, " W") : nothing}
         ${g ? metric("GPU Temp", cToF(g.temperatureCelsius), "\u00b0F") : nothing}
-        ${hasSys ? metric("Net In", formatKBps(sys!.networkInKBps)) : nothing}
-        ${hasSys ? metric("Net Out", formatKBps(sys!.networkOutKBps)) : nothing}
+        ${hasSys ? metric("Net In", formatKBps(sys.networkInKBps)) : nothing}
+        ${hasSys ? metric("Net Out", formatKBps(sys.networkOutKBps)) : nothing}
       </div>
       <div class="muted" style="font-size: 0.8em; margin-top: 8px;">
         Collected ${formatAge(Date.now() - (gpu?.collectedAt ?? sys?.collectedAt ?? Date.now()))}
@@ -370,6 +371,45 @@ function renderMultimodalCard(infra: InfrastructureData) {
   `;
 }
 
+function renderMemoryCortexCard(mc: MemoryCortexSnapshot | undefined) {
+  if (!mc) {
+    return nothing;
+  }
+
+  return html`
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="card-title">AMD Radeon VII 16GB</div>
+        ${statusChip(mc.status)}
+      </div>
+      <div class="card-sub">Memory Cortex &mdash; ${mc.modelName ?? "unknown model"}</div>
+      <div style="margin-top: 12px;">
+        <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${mc.llmStatus === "ok" ? "var(--green, #3fb950)" : "var(--red, #f85149)"}; display: inline-block;"></span>
+            <span style="font-size: 0.85em;">LLM Server</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${mc.middlewareStatus === "ok" ? "var(--green, #3fb950)" : "var(--red, #f85149)"}; display: inline-block;"></span>
+            <span style="font-size: 0.85em;">Middleware</span>
+          </div>
+        </div>
+        ${mc.vramUsedMB != null ? progressBar(mc.vramUsedMB, mc.vramTotalMB, `VRAM ~${mc.vramUsedMB} / ${mc.vramTotalMB} MB`) : metric("VRAM", `${mc.vramTotalMB} MB total`)}
+        ${mc.kvCacheUsageRatio != null ? progressBar(Math.round(mc.kvCacheUsageRatio * 100), 100, `KV Cache${mc.kvCacheTokens != null ? ` (${mc.kvCacheTokens} tokens)` : ""}`) : nothing}
+        ${mc.generationTokPerSec != null ? metric("Generation", mc.generationTokPerSec, " tok/s") : nothing}
+        ${mc.promptTokPerSec != null ? metric("Prompt Proc", mc.promptTokPerSec, " tok/s") : nothing}
+        ${mc.requestsProcessing != null ? metric("Active Requests", mc.requestsProcessing) : nothing}
+        ${mc.memoriesCount != null ? metric("Memories Stored", mc.memoriesCount) : nothing}
+        ${mc.llmLatencyMs != null ? metric("LLM Latency", mc.llmLatencyMs, " ms") : nothing}
+        ${mc.middlewareLatencyMs != null ? metric("Middleware Latency", mc.middlewareLatencyMs, " ms") : nothing}
+      </div>
+      <div class="muted" style="font-size: 0.8em; margin-top: 8px;">
+        Collected ${formatAge(Date.now() - mc.collectedAt)}
+      </div>
+    </div>
+  `;
+}
+
 export function renderHardware(props: HardwareProps) {
   return html`
     <section>
@@ -397,6 +437,7 @@ export function renderHardware(props: HardwareProps) {
           ${renderLocalSystemCard(props.infra.localGpu, props.infra.systemMetrics)}
           ${renderProviderCard(props.infra)}
           ${renderGatewayCard(props.health)}
+          ${renderMemoryCortexCard(props.infra.memoryCortex)}
           ${renderTunnelCard(props.infra.tunnels)}
           ${renderMultimodalCard(props.infra)}
         </div>

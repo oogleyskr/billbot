@@ -6,6 +6,7 @@ import {
   collectRemoteGpuMetrics,
 } from "./gpu-metrics.js";
 import { type InferenceSpeedSnapshot, getInferenceSpeed } from "./inference-speed.js";
+import { type MemoryCortexSnapshot, collectMemoryCortexHealth } from "./memory-cortex-health.js";
 import { type MultimodalHealthSnapshot, checkMultimodalHealth } from "./multimodal-health.js";
 import {
   type ProviderHealthSnapshot,
@@ -26,6 +27,7 @@ export type InfrastructureSnapshot = {
   gpu?: GpuMetricsSnapshot;
   localGpu?: GpuMetricsSnapshot;
   multimodal?: MultimodalHealthSnapshot;
+  memoryCortex?: MemoryCortexSnapshot;
   systemMetrics?: SystemMetricsSnapshot;
   remoteSystemMetrics?: SystemMetricsSnapshot;
   inferenceSpeed?: InferenceSpeedSnapshot;
@@ -40,6 +42,7 @@ let tunnelInterval: ReturnType<typeof setInterval> | null = null;
 let providerInterval: ReturnType<typeof setInterval> | null = null;
 let multimodalInterval: ReturnType<typeof setInterval> | null = null;
 let systemMetricsInterval: ReturnType<typeof setInterval> | null = null;
+let memoryCortexInterval: ReturnType<typeof setInterval> | null = null;
 
 // Cached results from the most recent polling cycle. The gateway's RPC
 // handler reads these via getInfrastructureSnapshot() without triggering
@@ -48,6 +51,7 @@ let cachedGpu: GpuMetricsSnapshot | null = null;
 let cachedLocalGpu: GpuMetricsSnapshot | null = null;
 let cachedTunnels: TunnelMonitorResult[] | null = null;
 let cachedMultimodal: MultimodalHealthSnapshot | null = null;
+let cachedMemoryCortex: MemoryCortexSnapshot | null = null;
 let cachedSystemMetrics: SystemMetricsSnapshot | null = null;
 let cachedRemoteSystemMetrics: SystemMetricsSnapshot | null = null;
 
@@ -112,6 +116,15 @@ async function refreshRemoteSystemMetrics(infraCfg: InfrastructureConfig): Promi
   });
 }
 
+/** Collect Memory Cortex (Radeon VII + middleware) health and cache the result. */
+async function refreshMemoryCortex(infraCfg: InfrastructureConfig): Promise<void> {
+  const mcCfg = infraCfg.memoryCortex;
+  if (!mcCfg?.enabled) {
+    return;
+  }
+  cachedMemoryCortex = await collectMemoryCortexHealth(mcCfg);
+}
+
 /** Check all configured tunnels in parallel and cache the results. */
 async function refreshTunnels(infraCfg: InfrastructureConfig): Promise<void> {
   const tunnelConfigs = infraCfg.tunnels;
@@ -143,6 +156,7 @@ export function getInfrastructureSnapshot(): InfrastructureSnapshot {
     gpu: cachedGpu ?? undefined,
     localGpu: cachedLocalGpu ?? undefined,
     multimodal: cachedMultimodal ?? undefined,
+    memoryCortex: cachedMemoryCortex ?? undefined,
     systemMetrics: cachedSystemMetrics ?? undefined,
     remoteSystemMetrics: cachedRemoteSystemMetrics ?? undefined,
     inferenceSpeed: getInferenceSpeed() ?? undefined,
@@ -180,6 +194,11 @@ export async function probeInfrastructure(cfg: OpenClawConfig): Promise<Infrastr
     // Multimodal services
     if (infraCfg.multimodal && infraCfg.multimodal.length > 0) {
       tasks.push(refreshMultimodal(infraCfg));
+    }
+
+    // Memory Cortex (Radeon VII)
+    if (infraCfg.memoryCortex?.enabled) {
+      tasks.push(refreshMemoryCortex(infraCfg));
     }
 
     // System metrics
@@ -271,6 +290,16 @@ export function startInfrastructureMonitor(cfg: OpenClawConfig): void {
     multimodalInterval.unref();
   }
 
+  // Memory Cortex (Radeon VII + middleware)
+  if (infraCfg.memoryCortex?.enabled) {
+    const mcIntervalSec = infraCfg.memoryCortex.intervalSeconds ?? 15;
+    void refreshMemoryCortex(infraCfg);
+    memoryCortexInterval = setInterval(() => {
+      void refreshMemoryCortex(infraCfg);
+    }, mcIntervalSec * 1000);
+    memoryCortexInterval.unref();
+  }
+
   // System metrics (CPU, RAM, network)
   if (infraCfg.systemMetrics?.enabled) {
     const sysIntervalSec = infraCfg.systemMetrics.intervalSeconds ?? 10;
@@ -322,11 +351,16 @@ export function stopInfrastructureMonitor(): void {
     clearInterval(systemMetricsInterval);
     systemMetricsInterval = null;
   }
+  if (memoryCortexInterval) {
+    clearInterval(memoryCortexInterval);
+    memoryCortexInterval = null;
+  }
 
   cachedGpu = null;
   cachedLocalGpu = null;
   cachedTunnels = null;
   cachedMultimodal = null;
+  cachedMemoryCortex = null;
   cachedSystemMetrics = null;
   cachedRemoteSystemMetrics = null;
 }

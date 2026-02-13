@@ -71,6 +71,28 @@ export type InferenceSpeedSnapshot = {
   lastMeasuredAt: number;
 };
 
+export type MemoryCortexSnapshot = {
+  status: "ok" | "degraded" | "error";
+  llmStatus: "ok" | "error";
+  llmEndpoint: string;
+  modelName?: string;
+  gpuName: string;
+  vramTotalMB: number;
+  vramUsedMB?: number;
+  generationTokPerSec?: number;
+  promptTokPerSec?: number;
+  kvCacheUsageRatio?: number;
+  kvCacheTokens?: number;
+  requestsProcessing?: number;
+  middlewareStatus: "ok" | "error";
+  middlewareEndpoint: string;
+  memoriesCount?: number;
+  middlewareLatencyMs?: number;
+  llmLatencyMs?: number;
+  collectedAt: number;
+  error?: string;
+};
+
 export type InfrastructureData = {
   providers?: {
     providers: Record<string, ProviderHealthStatus>;
@@ -85,6 +107,7 @@ export type InfrastructureData = {
     servicesTotal: number;
     checkedAt: number;
   };
+  memoryCortex?: MemoryCortexSnapshot;
   systemMetrics?: SystemMetricsSnapshot;
   remoteSystemMetrics?: SystemMetricsSnapshot;
   inferenceSpeed?: InferenceSpeedSnapshot;

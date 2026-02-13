@@ -83,3 +83,7 @@ USER.md
 .agent/*.json
 !.agent/workflows/
 local/
+
+# Local config with secrets
+beta-config/
+ANALYSIS.md

@@ -55,6 +55,21 @@ export type SystemMetricsConfig = {
   intervalSeconds?: number;
 };
 
+export type MemoryCortexConfig = {
+  /** Enable Memory Cortex monitoring (default: false). */
+  enabled?: boolean;
+  /** Host where the llama-server runs (default: 172.17.96.1 for WSL2→Windows). */
+  llmHost?: string;
+  /** Port for the llama-server (default: 8301). */
+  llmPort?: number;
+  /** Host where the middleware runs (default: localhost). */
+  middlewareHost?: string;
+  /** Port for the middleware (default: 8300). */
+  middlewarePort?: number;
+  /** How often to collect metrics in seconds (default: 15). */
+  intervalSeconds?: number;
+};
+
 export type InfrastructureConfig = {
   /** SSH tunnel endpoints to monitor for connectivity. */
   tunnels?: SshTunnelMonitorConfig[];
@@ -66,4 +81,6 @@ export type InfrastructureConfig = {
   multimodal?: MultimodalServiceConfig[];
   /** System metrics (CPU, RAM, network) for the gateway host. */
   systemMetrics?: SystemMetricsConfig;
+  /** Memory Cortex (Radeon VII + middleware) monitoring. */
+  memoryCortex?: MemoryCortexConfig;
 };
