@@ -170,6 +170,7 @@ function parseLhmGpuMetrics(data: LhmNode): LhmGpuMetrics | undefined {
   const temps = findLhmChild(gpu, "temperature");
   const clocks = findLhmChild(gpu, "clock");
   const fans = findLhmChild(gpu, "fan");
+  const controls = findLhmChild(gpu, "control");
   const powers = findLhmChild(gpu, "power");
   const loads = findLhmChild(gpu, "load");
 
@@ -200,7 +201,7 @@ function parseLhmGpuMetrics(data: LhmNode): LhmGpuMetrics | undefined {
     memoryClockMHz: findLhmSensor(clocks, "memory"),
     utilizationPercent: findLhmSensor(loads, "core") ?? findLhmSensor(loads, "gpu"),
     fanRPM: findLhmSensor(fans, "fan"),
-    fanPercent: findLhmSensor(fans, "fan") != null ? findLhmSensor(loads, "fan") : undefined,
+    fanPercent: findLhmSensor(controls, "fan"),
     powerDrawWatts:
       findLhmSensor(powers, "package") ??
       findLhmSensor(powers, "total") ??
