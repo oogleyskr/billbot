@@ -115,4 +115,4 @@ Config lives at `~/.openclaw/openclaw.json`. Key settings for this fork:
 
 ## Credits
 
-Built on [OpenClaw](https://github.com/openclaw/openclaw) by Peter Steinberger and the OpenClaw community. Licensed under MIT.
+Built by **Oogley** and **Claude** on top of [OpenClaw](https://github.com/openclaw/openclaw). Licensed under MIT.
