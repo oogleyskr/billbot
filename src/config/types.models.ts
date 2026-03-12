@@ -18,6 +18,7 @@ export type ModelCompatConfig = {
   supportsDeveloperRole?: boolean;
   supportsReasoningEffort?: boolean;
   supportsUsageInStreaming?: boolean;
+  supportsTools?: boolean;
   supportsStrictMode?: boolean;
   maxTokensField?: "max_completion_tokens" | "max_tokens";
   thinkingFormat?: "openai" | "zai" | "qwen";
@@ -25,12 +26,7 @@ export type ModelCompatConfig = {
   requiresAssistantAfterToolResult?: boolean;
   requiresThinkingAsText?: boolean;
   requiresMistralToolIds?: boolean;
-  /**
-   * Configurable patterns for parsing non-standard tool call formats from model output.
-   * Each pattern has a `tag` (XML tag name) and optional `format` hint.
-   * Example: [{ "tag": "tool_call" }, { "tag": "tools" }]
-   */
-  toolCallPatterns?: Array<{ tag: string; format?: "json" | "name-arguments" }>;
+  requiresOpenAiAnthropicToolPayload?: boolean;
 };
 
 export type ModelProviderAuthMode = "api-key" | "aws-sdk" | "oauth" | "token";
@@ -59,26 +55,9 @@ export type ModelProviderConfig = {
   auth?: ModelProviderAuthMode;
   api?: ModelApi;
   injectNumCtxForOpenAICompat?: boolean;
-  headers?: Record<string, string>;
+  headers?: Record<string, SecretInput>;
   authHeader?: boolean;
   models: ModelDefinitionConfig[];
-  /** Health check configuration for the provider endpoint. */
-  healthCheck?: {
-    enabled?: boolean;
-    /** Endpoint path to check (default: "/health"). */
-    endpoint?: string;
-    /** Interval in seconds between checks. */
-    intervalSeconds?: number;
-  };
-  /** Retry configuration for failed requests to this provider. */
-  retry?: {
-    /** Maximum number of retry attempts. */
-    attempts?: number;
-    /** Minimum delay between retries in milliseconds. */
-    minDelayMs?: number;
-    /** Maximum delay between retries in milliseconds. */
-    maxDelayMs?: number;
-  };
 };
 
 export type BedrockDiscoveryConfig = {

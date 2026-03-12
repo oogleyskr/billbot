@@ -152,6 +152,15 @@ export function parseInlineDirectives(
       hasReplyTag: false,
     };
   }
+  if (!text.includes("[[")) {
+    return {
+      text: normalizeDirectiveWhitespace(text),
+      audioAsVoice: false,
+      replyToCurrent: false,
+      hasAudioTag: false,
+      hasReplyTag: false,
+    };
+  }
 
   let cleaned = stripModelInternalTokens(text);
   let audioAsVoice = false;

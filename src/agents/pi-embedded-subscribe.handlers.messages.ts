@@ -2,9 +2,7 @@ import type { AgentEvent, AgentMessage } from "@mariozechner/pi-agent-core";
 import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
-import { recordInference } from "../infra/inference-speed.js";
 import { createInlineCodeState } from "../markdown/code-spans.js";
-import { stripModelInternalTokens } from "../utils/directive-tags.js";
 import {
   isMessagingToolDuplicateNormalized,
   normalizeTextForComparison,
@@ -19,7 +17,6 @@ import {
   formatReasoningMessage,
   promoteThinkingTagsToBlocks,
 } from "./pi-embedded-utils.js";
-import { normalizeUsage } from "./usage.js";
 
 const stripTrailingDirective = (text: string): string => {
   const openIndex = text.lastIndexOf("[[");
@@ -68,11 +65,8 @@ export function handleMessageStart(
     return;
   }
 
-  // Record start time for tok/s calculation in handleMessageEnd.
-  ctx.state.assistantMessageStartedAt = Date.now();
-
   // KNOWN: Resetting at `text_end` is unsafe (late/duplicate end events).
-  // ASSUME: `message_start` is the only reliable boundary for "new assistant message begins".
+  // ASSUME: `message_start` is the only reliable boundary for “new assistant message begins”.
   // Start-of-message is a safer reset point than message_end: some providers
   // may deliver late text_end updates after message_end, which would otherwise
   // re-trigger block replies.
@@ -91,6 +85,9 @@ export function handleMessageUpdate(
   }
 
   ctx.noteLastAssistant(msg);
+  if (ctx.state.deterministicApprovalPromptSent) {
+    return;
+  }
 
   const assistantEvent = evt.assistantMessageEvent;
   const assistantRecord =
@@ -267,33 +264,12 @@ export function handleMessageEnd(
   const assistantMessage = msg;
   ctx.noteLastAssistant(assistantMessage);
   ctx.recordAssistantUsage((assistantMessage as { usage?: unknown }).usage);
-
+  if (ctx.state.deterministicApprovalPromptSent) {
+    return;
+  }
   promoteThinkingTagsToBlocks(assistantMessage);
 
   const rawText = extractAssistantText(assistantMessage);
-
-  // Calculate and record tok/s for the Hardware tab.
-  if (ctx.state.assistantMessageStartedAt) {
-    const durationMs = Date.now() - ctx.state.assistantMessageStartedAt;
-    const usage = normalizeUsage((assistantMessage as { usage?: unknown }).usage as never);
-    let outputTokens = usage?.output ?? 0;
-    // Fallback: estimate tokens from text (~4 chars per token) when provider
-    // doesn't return usage data (e.g. llama.cpp streaming).
-    // Include reasoning/thinking tokens — models like gpt-oss generate most
-    // output as reasoning_content which extractAssistantText doesn't include.
-    if (outputTokens === 0) {
-      const textLen = rawText?.length ?? 0;
-      const thinkingLen = extractAssistantThinking(assistantMessage)?.length ?? 0;
-      const totalChars = textLen + thinkingLen;
-      if (totalChars > 0) {
-        outputTokens = Math.max(1, Math.round(totalChars / 4));
-      }
-    }
-    if (outputTokens > 0 && durationMs > 100) {
-      recordInference(outputTokens, durationMs);
-    }
-    ctx.state.assistantMessageStartedAt = undefined;
-  }
   appendRawStream({
     ts: Date.now(),
     event: "assistant_message_end",
@@ -303,12 +279,10 @@ export function handleMessageEnd(
     rawThinking: extractAssistantThinking(assistantMessage),
   });
 
-  const text = stripModelInternalTokens(
-    resolveSilentReplyFallbackText({
-      text: ctx.stripBlockTags(rawText, { thinking: false, final: false }),
-      messagingToolSentTexts: ctx.state.messagingToolSentTexts,
-    }),
-  );
+  const text = resolveSilentReplyFallbackText({
+    text: ctx.stripBlockTags(rawText, { thinking: false, final: false }),
+    messagingToolSentTexts: ctx.state.messagingToolSentTexts,
+  });
   const rawThinking =
     ctx.state.includeReasoning || ctx.state.streamReasoning
       ? extractAssistantThinking(assistantMessage) || extractThinkingFromTaggedText(rawText)
@@ -320,7 +294,7 @@ export function handleMessageEnd(
   let mediaUrls = parsedText?.mediaUrls;
   let hasMedia = Boolean(mediaUrls && mediaUrls.length > 0);
 
-  if (!cleanedText && !hasMedia) {
+  if (!cleanedText && !hasMedia && !ctx.params.enforceFinalTag) {
     const rawTrimmed = rawText.trim();
     const rawStrippedFinal = rawTrimmed.replace(/<\s*\/?\s*final\s*>/gi, "").trim();
     const rawCandidate = rawStrippedFinal || rawTrimmed;
@@ -331,12 +305,6 @@ export function handleMessageEnd(
       hasMedia = Boolean(mediaUrls && mediaUrls.length > 0);
     }
   }
-
-  // NOTE: Do NOT use reasoning/thinking as fallback reply content.
-  // The model's reasoning_content is internal thinking and often contains garbled
-  // text (zero-width spaces, ellipsis spam, etc.) that should never reach users.
-  // If the model produces only reasoning with no content, the nudge loop in
-  // attempt.ts will retry. If all retries fail, silence is better than garbage.
 
   if (!ctx.state.emittedAssistantUpdate && (cleanedText || hasMedia)) {
     emitAgentEvent({
@@ -364,6 +332,16 @@ export function handleMessageEnd(
   ctx.finalizeAssistantTexts({ text, addedDuringMessage, chunkerHasBuffered });
 
   const onBlockReply = ctx.params.onBlockReply;
+  const emitBlockReplySafely = (payload: Parameters<NonNullable<typeof onBlockReply>>[0]) => {
+    if (!onBlockReply) {
+      return;
+    }
+    void Promise.resolve()
+      .then(() => onBlockReply(payload))
+      .catch((err) => {
+        ctx.log.warn(`block reply callback failed: ${String(err)}`);
+      });
+  };
   const shouldEmitReasoning = Boolean(
     ctx.state.includeReasoning &&
     formattedReasoning &&
@@ -377,12 +355,39 @@ export function handleMessageEnd(
       return;
     }
     ctx.state.lastReasoningSent = formattedReasoning;
-    void onBlockReply?.({ text: formattedReasoning, isReasoning: true });
+    emitBlockReplySafely({ text: formattedReasoning, isReasoning: true });
   };
 
   if (shouldEmitReasoningBeforeAnswer) {
     maybeEmitReasoning();
   }
+
+  const emitSplitResultAsBlockReply = (
+    splitResult: ReturnType<typeof ctx.consumeReplyDirectives> | null | undefined,
+  ) => {
+    if (!splitResult || !onBlockReply) {
+      return;
+    }
+    const {
+      text: cleanedText,
+      mediaUrls,
+      audioAsVoice,
+      replyToId,
+      replyToTag,
+      replyToCurrent,
+    } = splitResult;
+    // Emit if there's content OR audioAsVoice flag (to propagate the flag).
+    if (cleanedText || (mediaUrls && mediaUrls.length > 0) || audioAsVoice) {
+      emitBlockReplySafely({
+        text: cleanedText,
+        mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
+        audioAsVoice,
+        replyToId,
+        replyToTag,
+        replyToCurrent,
+      });
+    }
+  };
 
   if (
     (ctx.state.blockReplyBreak === "message_end" ||
@@ -407,28 +412,7 @@ export function handleMessageEnd(
         );
       } else {
         ctx.state.lastBlockReplyText = text;
-        const splitResult = ctx.consumeReplyDirectives(text, { final: true });
-        if (splitResult) {
-          const {
-            text: cleanedText,
-            mediaUrls,
-            audioAsVoice,
-            replyToId,
-            replyToTag,
-            replyToCurrent,
-          } = splitResult;
-          // Emit if there's content OR audioAsVoice flag (to propagate the flag).
-          if (cleanedText || (mediaUrls && mediaUrls.length > 0) || audioAsVoice) {
-            void onBlockReply({
-              text: cleanedText,
-              mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
-              audioAsVoice,
-              replyToId,
-              replyToTag,
-              replyToCurrent,
-            });
-          }
-        }
+        emitSplitResultAsBlockReply(ctx.consumeReplyDirectives(text, { final: true }));
       }
     }
   }
@@ -441,27 +425,7 @@ export function handleMessageEnd(
   }
 
   if (ctx.state.blockReplyBreak === "text_end" && onBlockReply) {
-    const tailResult = ctx.consumeReplyDirectives("", { final: true });
-    if (tailResult) {
-      const {
-        text: cleanedText,
-        mediaUrls,
-        audioAsVoice,
-        replyToId,
-        replyToTag,
-        replyToCurrent,
-      } = tailResult;
-      if (cleanedText || (mediaUrls && mediaUrls.length > 0) || audioAsVoice) {
-        void onBlockReply({
-          text: cleanedText,
-          mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
-          audioAsVoice,
-          replyToId,
-          replyToTag,
-          replyToCurrent,
-        });
-      }
-    }
+    emitSplitResultAsBlockReply(ctx.consumeReplyDirectives("", { final: true }));
   }
 
   ctx.state.deltaBuffer = "";

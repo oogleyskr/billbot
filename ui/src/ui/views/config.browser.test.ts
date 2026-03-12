@@ -1,5 +1,6 @@
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
+import type { ThemeMode, ThemeName } from "../theme.ts";
 import { renderConfig } from "./config.ts";
 
 describe("config view", () => {
@@ -35,7 +36,25 @@ describe("config view", () => {
     onApply: vi.fn(),
     onUpdate: vi.fn(),
     onSubsectionChange: vi.fn(),
+    version: "2026.3.11",
+    theme: "claw" as ThemeName,
+    themeMode: "system" as ThemeMode,
+    setTheme: vi.fn(),
+    setThemeMode: vi.fn(),
+    gatewayUrl: "",
+    assistantName: "OpenClaw",
   });
+
+  function findActionButtons(container: HTMLElement): {
+    saveButton?: HTMLButtonElement;
+    applyButton?: HTMLButtonElement;
+  } {
+    const buttons = Array.from(container.querySelectorAll("button"));
+    return {
+      saveButton: buttons.find((btn) => btn.textContent?.trim() === "Save"),
+      applyButton: buttons.find((btn) => btn.textContent?.trim() === "Apply"),
+    };
+  }
 
   it("allows save when form is unsafe", () => {
     const container = document.createElement("div");
@@ -97,12 +116,7 @@ describe("config view", () => {
       container,
     );
 
-    const saveButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Save",
-    );
-    const applyButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Apply",
-    );
+    const { saveButton, applyButton } = findActionButtons(container);
     expect(saveButton).not.toBeUndefined();
     expect(applyButton).not.toBeUndefined();
     expect(saveButton?.disabled).toBe(true);
@@ -121,12 +135,7 @@ describe("config view", () => {
       container,
     );
 
-    const saveButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Save",
-    );
-    const applyButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Apply",
-    );
+    const { saveButton, applyButton } = findActionButtons(container);
     expect(saveButton).not.toBeUndefined();
     expect(applyButton).not.toBeUndefined();
     expect(saveButton?.disabled).toBe(false);
