@@ -20,6 +20,7 @@ import {
   collectRemoteSystemMetrics,
 } from "./system-metrics.js";
 import { type TunnelMonitorResult, checkTunnelHealth } from "./tunnel-monitor.js";
+import { type VpsSnapshot, collectVpsStatus } from "./vps-status.js";
 
 export type InfrastructureSnapshot = {
   providers?: ProviderHealthSnapshot;
@@ -31,6 +32,7 @@ export type InfrastructureSnapshot = {
   systemMetrics?: SystemMetricsSnapshot;
   remoteSystemMetrics?: SystemMetricsSnapshot;
   inferenceSpeed?: InferenceSpeedSnapshot;
+  vps?: VpsSnapshot;
   collectedAt: number;
 };
 
@@ -54,6 +56,8 @@ let cachedMultimodal: MultimodalHealthSnapshot | null = null;
 let cachedMemoryCortex: MemoryCortexSnapshot | null = null;
 let cachedSystemMetrics: SystemMetricsSnapshot | null = null;
 let cachedRemoteSystemMetrics: SystemMetricsSnapshot | null = null;
+let cachedVps: VpsSnapshot | null = null;
+let vpsInterval: ReturnType<typeof setInterval> | null = null;
 
 /** Refresh GPU metrics from local or remote nvidia-smi and cache the result. */
 async function refreshGpuMetrics(infraCfg: InfrastructureConfig): Promise<void> {
@@ -125,6 +129,11 @@ async function refreshMemoryCortex(infraCfg: InfrastructureConfig): Promise<void
   cachedMemoryCortex = await collectMemoryCortexHealth(mcCfg);
 }
 
+/** Collect VPS infrastructure status (MCPJungle, Mesh, services, Claude Code). */
+async function refreshVpsStatus(): Promise<void> {
+  cachedVps = await collectVpsStatus();
+}
+
 /** Check all configured tunnels in parallel and cache the results. */
 async function refreshTunnels(infraCfg: InfrastructureConfig): Promise<void> {
   const tunnelConfigs = infraCfg.tunnels;
@@ -160,6 +169,7 @@ export function getInfrastructureSnapshot(): InfrastructureSnapshot {
     systemMetrics: cachedSystemMetrics ?? undefined,
     remoteSystemMetrics: cachedRemoteSystemMetrics ?? undefined,
     inferenceSpeed: getInferenceSpeed() ?? undefined,
+    vps: cachedVps ?? undefined,
     collectedAt: Date.now(),
   };
 }
@@ -211,6 +221,9 @@ export async function probeInfrastructure(cfg: OpenClawConfig): Promise<Infrastr
       tasks.push(refreshRemoteSystemMetrics(infraCfg));
     }
   }
+
+  // VPS status (MCPJungle, Mesh, services, Claude Code) — always collected
+  tasks.push(refreshVpsStatus());
 
   // allSettled so one failing subsystem doesn't block the others.
   await Promise.allSettled(tasks);
@@ -319,6 +332,13 @@ export function startInfrastructureMonitor(cfg: OpenClawConfig): void {
     }, gpuIntervalSec * 1000);
     remoteInterval.unref();
   }
+
+  // VPS status (MCPJungle, Mesh, services, Claude Code) — poll every 30s
+  void refreshVpsStatus();
+  vpsInterval = setInterval(() => {
+    void refreshVpsStatus();
+  }, 30_000);
+  vpsInterval.unref();
 }
 
 /**
@@ -355,6 +375,10 @@ export function stopInfrastructureMonitor(): void {
     clearInterval(memoryCortexInterval);
     memoryCortexInterval = null;
   }
+  if (vpsInterval) {
+    clearInterval(vpsInterval);
+    vpsInterval = null;
+  }
 
   cachedGpu = null;
   cachedLocalGpu = null;
@@ -363,4 +387,5 @@ export function stopInfrastructureMonitor(): void {
   cachedMemoryCortex = null;
   cachedSystemMetrics = null;
   cachedRemoteSystemMetrics = null;
+  cachedVps = null;
 }
