@@ -156,6 +156,60 @@ async function refreshTunnels(infraCfg: InfrastructureConfig): Promise<void> {
 }
 
 /**
+ * Get available capabilities based on what services are actually online.
+ * Used for capability-aware tool registration — don't offer tools for offline services.
+ */
+export function getAvailableCapabilities(): Set<string> {
+  const caps = new Set<string>();
+
+  // LLM inference
+  const providerSnap = getProviderHealthSnapshot();
+  if (providerSnap?.providers) {
+    for (const [name, status] of Object.entries(providerSnap.providers)) {
+      if (status.healthy) caps.add(`provider:${name}`);
+    }
+  }
+
+  // Multimodal services
+  if (cachedMultimodal?.services) {
+    for (const svc of cachedMultimodal.services) {
+      if (svc.status === "ok") {
+        const label = svc.label.toLowerCase();
+        if (label.includes("stt") || label.includes("whisper")) caps.add("stt");
+        if (label.includes("vision")) caps.add("vision");
+        if (label.includes("tts")) caps.add("tts");
+        if (label.includes("image")) caps.add("imagegen");
+        if (label.includes("embed")) caps.add("embeddings");
+        if (label.includes("doc")) caps.add("docparse");
+      }
+    }
+  }
+
+  // Memory Cortex
+  if (cachedMemoryCortex && cachedMemoryCortex.status === "ok") {
+    caps.add("memory");
+    caps.add("memory-recall");
+    caps.add("memory-store");
+  }
+
+  // VPS services
+  if (cachedVps) {
+    if (cachedVps.mcpjungle?.healthy) caps.add("mcpjungle");
+    if (cachedVps.mesh?.alive) caps.add("mesh");
+    if (cachedVps.claudeCode?.available) caps.add("claude-code");
+  }
+
+  return caps;
+}
+
+/**
+ * Check if a specific capability is currently available.
+ */
+export function hasCapability(name: string): boolean {
+  return getAvailableCapabilities().has(name);
+}
+
+/**
  * Get the current infrastructure snapshot without triggering new probes.
  */
 export function getInfrastructureSnapshot(): InfrastructureSnapshot {
