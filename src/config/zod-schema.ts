@@ -11,7 +11,7 @@ import {
   SecretsConfigSchema,
 } from "./zod-schema.core.js";
 import { HookMappingSchema, HooksGmailSchema, InternalHooksSchema } from "./zod-schema.hooks.js";
-import { InstallRecordShape } from "./zod-schema.installs.js";
+import { PluginInstallRecordShape } from "./zod-schema.installs.js";
 import { ChannelsSchema } from "./zod-schema.providers.js";
 import { sensitive } from "./zod-schema.sensitive.js";
 import {
@@ -155,6 +155,13 @@ const PluginEntrySchema = z
       })
       .strict()
       .optional(),
+    subagent: z
+      .object({
+        allowModelOverride: z.boolean().optional(),
+        allowedModels: z.array(z.string()).optional(),
+      })
+      .strict()
+      .optional(),
     config: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
@@ -202,6 +209,24 @@ const TalkSchema = z
       });
     }
   });
+
+const McpServerSchema = z
+  .object({
+    command: z.string().optional(),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+    cwd: z.string().optional(),
+    workingDirectory: z.string().optional(),
+    url: HttpUrlSchema.optional(),
+  })
+  .catchall(z.unknown());
+
+const McpConfigSchema = z
+  .object({
+    servers: z.record(z.string(), McpServerSchema).optional(),
+  })
+  .strict()
+  .optional();
 
 export const OpenClawSchema = z
   .object({
@@ -359,20 +384,26 @@ export const OpenClawSchema = z
               .object({
                 cdpPort: z.number().int().min(1).max(65535).optional(),
                 cdpUrl: z.string().optional(),
+                userDataDir: z.string().optional(),
                 driver: z
-                  .union([z.literal("openclaw"), z.literal("clawd"), z.literal("extension")])
+                  .union([z.literal("openclaw"), z.literal("clawd"), z.literal("existing-session")])
                   .optional(),
                 attachOnly: z.boolean().optional(),
                 color: HexColorSchema,
               })
               .strict()
-              .refine((value) => value.cdpPort || value.cdpUrl, {
-                message: "Profile must set cdpPort or cdpUrl",
+              .refine(
+                (value) => value.driver === "existing-session" || value.cdpPort || value.cdpUrl,
+                {
+                  message: "Profile must set cdpPort or cdpUrl",
+                },
+              )
+              .refine((value) => value.driver === "existing-session" || !value.userDataDir, {
+                message: 'Profile userDataDir is only supported with driver="existing-session"',
               }),
           )
           .optional(),
         extraArgs: z.array(z.string()).optional(),
-        relayBindHost: z.union([z.string().ipv4(), z.string().ipv6()]).optional(),
       })
       .strict()
       .optional(),
@@ -596,6 +627,7 @@ export const OpenClawSchema = z
         wideArea: z
           .object({
             enabled: z.boolean().optional(),
+            domain: z.string().optional(),
           })
           .strict()
           .optional(),
@@ -687,6 +719,8 @@ export const OpenClawSchema = z
           .strict()
           .optional(),
         channelHealthCheckMinutes: z.number().int().min(0).optional(),
+        channelStaleEventThresholdMinutes: z.number().int().min(1).optional(),
+        channelMaxRestartsPerHour: z.number().int().min(1).optional(),
         tailscale: z
           .object({
             mode: z.union([z.literal("off"), z.literal("serve"), z.literal("funnel")]).optional(),
@@ -717,6 +751,7 @@ export const OpenClawSchema = z
               ])
               .optional(),
             debounceMs: z.number().int().min(0).optional(),
+            deferralTimeoutMs: z.number().int().min(0).optional(),
           })
           .strict()
           .optional(),
@@ -824,94 +859,24 @@ export const OpenClawSchema = z
           .optional(),
       })
       .strict()
+      .superRefine((gateway, ctx) => {
+        const effectiveHealthCheckMinutes = gateway.channelHealthCheckMinutes ?? 5;
+        if (
+          gateway.channelStaleEventThresholdMinutes != null &&
+          effectiveHealthCheckMinutes !== 0 &&
+          gateway.channelStaleEventThresholdMinutes < effectiveHealthCheckMinutes
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["channelStaleEventThresholdMinutes"],
+            message:
+              "channelStaleEventThresholdMinutes should be >= channelHealthCheckMinutes to avoid delayed stale detection",
+          });
+        }
+      })
       .optional(),
     memory: MemorySchema,
-    infrastructure: z
-      .object({
-        tunnels: z
-          .array(
-            z
-              .object({
-                label: z.string().optional(),
-                host: z.string().optional(),
-                port: z.number().int().min(1).max(65535),
-                serviceName: z
-                  .string()
-                  .regex(
-                    /^[a-zA-Z0-9._@:-]+$/,
-                    "service name must contain only alphanumeric, dot, underscore, @, colon, or hyphen",
-                  )
-                  .optional(),
-                timeoutMs: z.number().int().positive().optional(),
-              })
-              .strict(),
-          )
-          .optional(),
-        gpu: z
-          .object({
-            enabled: z.boolean().optional(),
-            mode: z.union([z.literal("local"), z.literal("remote")]).optional(),
-            sshHost: z.string().optional(),
-            sshUser: z.string().optional(),
-            sshKeyPath: z.string().optional(),
-            sshPort: z.number().int().min(1).max(65535).optional(),
-            intervalSeconds: z.number().int().positive().optional(),
-            powerLimitWatts: z.number().positive().optional(),
-          })
-          .strict()
-          .optional(),
-        localGpu: z
-          .object({
-            enabled: z.boolean().optional(),
-            intervalSeconds: z.number().int().positive().optional(),
-          })
-          .strict()
-          .optional(),
-        multimodal: z
-          .array(
-            z
-              .object({
-                label: z.string(),
-                host: z.string().optional(),
-                port: z.number().int().min(1).max(65535),
-                healthPath: z.string().optional(),
-              })
-              .strict(),
-          )
-          .optional(),
-        systemMetrics: z
-          .object({
-            enabled: z.boolean().optional(),
-            intervalSeconds: z.number().int().positive().optional(),
-          })
-          .strict()
-          .optional(),
-        memoryCortex: z
-          .object({
-            enabled: z.boolean().optional(),
-            llmHost: z.string().optional(),
-            llmPort: z.number().int().min(1).max(65535).optional(),
-            middlewareHost: z.string().optional(),
-            middlewarePort: z.number().int().min(1).max(65535).optional(),
-            intervalSeconds: z.number().int().positive().optional(),
-            hwMonitorHost: z.string().optional(),
-            hwMonitorPort: z.number().int().min(1).max(65535).optional(),
-            hwMonitorEnabled: z.boolean().optional(),
-            autoIngest: z.boolean().optional(),
-            autoRecall: z.boolean().optional(),
-            recallTimeoutMs: z.number().int().positive().optional(),
-            recallMaxTokens: z.number().int().positive().optional(),
-            recallMaxFacts: z.number().int().positive().optional(),
-            synthesisCacheTtlMs: z.number().int().nonnegative().optional(),
-            skipHeartbeat: z.boolean().optional(),
-            embedHost: z.string().optional(),
-            embedPort: z.number().int().min(1).max(65535).optional(),
-          })
-          .strict()
-          .optional(),
-      })
-      .strict()
-      .optional(),
+    mcp: McpConfigSchema,
     skills: z
       .object({
         allowBundled: z.array(z.string()).optional(),
@@ -970,7 +935,7 @@ export const OpenClawSchema = z
             z.string(),
             z
               .object({
-                ...InstallRecordShape,
+                ...PluginInstallRecordShape,
               })
               .strict(),
           )

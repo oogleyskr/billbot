@@ -1,7 +1,7 @@
-import { Command } from "commander";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let runtimeStub: {
@@ -45,7 +45,7 @@ type RegisterCliContext = {
 function setup(config: Record<string, unknown>): Registered {
   const methods = new Map<string, unknown>();
   const tools: unknown[] = [];
-  plugin.register({
+  void plugin.register({
     id: "voice-call",
     name: "Voice Call",
     description: "test",
