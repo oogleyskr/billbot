@@ -81,15 +81,21 @@ async function checkMcpJungle(): Promise<McpJungleStatus> {
   const health = await httpGet("http://127.0.0.1:8090/health", 2000);
   const healthy = health != null && health.includes("ok");
 
+  // Read counts directly from MCPJungle SQLite DB via python3 (instant vs 30s CLI)
   let servers = 0;
   let tools = 0;
   try {
-    const srvOut = await runCmd("/usr/local/bin/mcpjungle", ["list", "servers"], 15000);
-    servers = srvOut.split("\n").filter((l) => /^\d/.test(l)).length;
-    const toolOut = await runCmd("/usr/local/bin/mcpjungle", ["list", "tools"], 15000);
-    tools = toolOut.split("\n").filter((l) => l.includes("ENABLED")).length;
+    const dbQuery = await runCmd("python3", [
+      "-c",
+      `import sqlite3,json;c=sqlite3.connect('file:///home/ubuntu/billbot-mcpjungle/mcpjungle.db?mode=ro',uri=True);s=c.execute("SELECT COUNT(*) FROM mcp_servers WHERE deleted_at IS NULL").fetchone()[0];t=c.execute("SELECT COUNT(*) FROM tools WHERE deleted_at IS NULL AND enabled=1").fetchone()[0];print(json.dumps({"s":s,"t":t}))`,
+    ], 3000);
+    if (dbQuery) {
+      const parsed = JSON.parse(dbQuery);
+      servers = parsed.s ?? 0;
+      tools = parsed.t ?? 0;
+    }
   } catch {
-    // CLI not available
+    // DB not available
   }
 
   return { healthy, servers, tools, port: 8090 };
