@@ -142,7 +142,7 @@ function renderDgxSparkCard(
       <div style="margin-top: 12px;">
         ${progressBar(g.utilizationPercent ?? 0, 100, "GPU Utilization")}
         ${progressBar(g.memoryUsedMB ?? 0, g.memoryTotalMB ?? 1, `VRAM ${g.memoryUsedMB ?? 0} / ${g.memoryTotalMB ?? 0} MB`)}
-        ${g.powerDrawWatts != null && g.powerLimitWatts != null ? progressBar(g.powerDrawWatts, g.powerLimitWatts, `Power ${g.powerDrawWatts.toFixed(0)} / ${g.powerLimitWatts.toFixed(0)} W`) : g.powerDrawWatts != null ? metric("Power Draw", `${g.powerDrawWatts.toFixed(0)}`, " W") : nothing}
+        ${g.powerDrawWatts != null && g.powerLimitWatts != null ? progressBar(g.powerDrawWatts, g.powerLimitWatts, `Power ${g.powerDrawWatts.toFixed(0)} / ${g.powerLimitWatts.toFixed(0)} W`) : g.powerDrawWatts != null ? metric("Power Draw", g.powerDrawWatts.toFixed(0), " W") : nothing}
         ${metric("Temperature", cToF(g.temperatureCelsius), "\u00b0F")}
         ${speed ? metric("Speed", `${speed.tokensPerSecond} tok/s (avg ${speed.averageTokPerSec})`) : nothing}
         ${remoteNet?.networkInKBps != null ? metric("Net In", formatKBps(remoteNet.networkInKBps)) : nothing}
@@ -190,7 +190,7 @@ function renderLocalSystemCard(
         ${hasSys && sys.ramUsedMB != null && sys.ramTotalMB != null ? progressBar(sys.ramUsedMB, sys.ramTotalMB, `RAM ${Math.round((sys.ramUsedMB / 1024) * 10) / 10} / ${Math.round((sys.ramTotalMB / 1024) * 10) / 10} GB`) : nothing}
         ${g ? progressBar(g.utilizationPercent ?? 0, 100, "GPU Utilization") : nothing}
         ${g ? progressBar(g.memoryUsedMB ?? 0, g.memoryTotalMB ?? 1, `VRAM ${g.memoryUsedMB ?? 0} / ${g.memoryTotalMB ?? 0} MB`) : nothing}
-        ${g?.powerDrawWatts != null && g?.powerLimitWatts != null ? progressBar(g.powerDrawWatts, g.powerLimitWatts, `Power ${g.powerDrawWatts.toFixed(0)} / ${g.powerLimitWatts.toFixed(0)} W`) : g?.powerDrawWatts != null ? metric("Power Draw", `${g.powerDrawWatts.toFixed(0)}`, " W") : nothing}
+        ${g?.powerDrawWatts != null && g?.powerLimitWatts != null ? progressBar(g.powerDrawWatts, g.powerLimitWatts, `Power ${g.powerDrawWatts.toFixed(0)} / ${g.powerLimitWatts.toFixed(0)} W`) : g?.powerDrawWatts != null ? metric("Power Draw", g.powerDrawWatts.toFixed(0), " W") : nothing}
         ${g ? metric("GPU Temp", cToF(g.temperatureCelsius), "\u00b0F") : nothing}
         ${hasSys ? metric("Net In", formatKBps(sys.networkInKBps)) : nothing}
         ${hasSys ? metric("Net Out", formatKBps(sys.networkOutKBps)) : nothing}

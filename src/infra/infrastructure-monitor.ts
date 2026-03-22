@@ -166,7 +166,9 @@ export function getAvailableCapabilities(): Set<string> {
   const providerSnap = getProviderHealthSnapshot();
   if (providerSnap?.providers) {
     for (const [name, status] of Object.entries(providerSnap.providers)) {
-      if (status.healthy) caps.add(`provider:${name}`);
+      if (status.healthy) {
+        caps.add(`provider:${name}`);
+      }
     }
   }
 
@@ -175,12 +177,24 @@ export function getAvailableCapabilities(): Set<string> {
     for (const svc of cachedMultimodal.services) {
       if (svc.status === "ok") {
         const label = svc.label.toLowerCase();
-        if (label.includes("stt") || label.includes("whisper")) caps.add("stt");
-        if (label.includes("vision")) caps.add("vision");
-        if (label.includes("tts")) caps.add("tts");
-        if (label.includes("image")) caps.add("imagegen");
-        if (label.includes("embed")) caps.add("embeddings");
-        if (label.includes("doc")) caps.add("docparse");
+        if (label.includes("stt") || label.includes("whisper")) {
+          caps.add("stt");
+        }
+        if (label.includes("vision")) {
+          caps.add("vision");
+        }
+        if (label.includes("tts")) {
+          caps.add("tts");
+        }
+        if (label.includes("image")) {
+          caps.add("imagegen");
+        }
+        if (label.includes("embed")) {
+          caps.add("embeddings");
+        }
+        if (label.includes("doc")) {
+          caps.add("docparse");
+        }
       }
     }
   }
@@ -194,9 +208,15 @@ export function getAvailableCapabilities(): Set<string> {
 
   // VPS services
   if (cachedVps) {
-    if (cachedVps.mcpjungle?.healthy) caps.add("mcpjungle");
-    if (cachedVps.mesh?.alive) caps.add("mesh");
-    if (cachedVps.claudeCode?.available) caps.add("claude-code");
+    if (cachedVps.mcpjungle?.healthy) {
+      caps.add("mcpjungle");
+    }
+    if (cachedVps.mesh?.alive) {
+      caps.add("mesh");
+    }
+    if (cachedVps.claudeCode?.available) {
+      caps.add("claude-code");
+    }
   }
 
   return caps;

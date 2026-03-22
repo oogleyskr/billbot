@@ -39,6 +39,7 @@ export type ModelCompatConfig = SupportedOpenAICompatFields & {
   toolCallArgumentsEncoding?: "html-entities";
   requiresMistralToolIds?: boolean;
   requiresOpenAiAnthropicToolPayload?: boolean;
+  toolCallPatterns?: Array<{ tag: string; format?: "json" | "name-arguments" }>;
 };
 
 export type ModelProviderAuthMode = "api-key" | "aws-sdk" | "oauth" | "token";
@@ -70,6 +71,11 @@ export type ModelProviderConfig = {
   headers?: Record<string, SecretInput>;
   authHeader?: boolean;
   models: ModelDefinitionConfig[];
+  healthCheck?: {
+    intervalSeconds?: number;
+    endpoint?: string;
+    timeout?: number;
+  };
 };
 
 export type BedrockDiscoveryConfig = {

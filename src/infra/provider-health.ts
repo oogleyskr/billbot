@@ -37,7 +37,9 @@ async function checkProviderHealth(
     const response = await fetch(url, {
       method: "GET",
       signal: controller.signal,
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+      headers: config.apiKey
+        ? { Authorization: `Bearer ${typeof config.apiKey === "string" ? config.apiKey : ""}` }
+        : {},
     });
 
     clearTimeout(timeout);
@@ -65,7 +67,9 @@ async function checkProviderHealth(
         const fallbackResponse = await fetch(fallbackUrl, {
           method: "GET",
           signal: fallbackController.signal,
-          headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+          headers: config.apiKey
+            ? { Authorization: `Bearer ${typeof config.apiKey === "string" ? config.apiKey : ""}` }
+            : {},
         });
         clearTimeout(fallbackTimeout);
         const fallbackLatency = Date.now() - startTime;

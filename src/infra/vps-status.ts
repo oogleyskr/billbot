@@ -85,10 +85,14 @@ async function checkMcpJungle(): Promise<McpJungleStatus> {
   let servers = 0;
   let tools = 0;
   try {
-    const dbQuery = await runCmd("python3", [
-      "-c",
-      `import sqlite3,json;c=sqlite3.connect('file:///home/ubuntu/billbot-mcpjungle/mcpjungle.db?mode=ro',uri=True);s=c.execute("SELECT COUNT(*) FROM mcp_servers WHERE deleted_at IS NULL").fetchone()[0];t=c.execute("SELECT COUNT(*) FROM tools WHERE deleted_at IS NULL AND enabled=1").fetchone()[0];print(json.dumps({"s":s,"t":t}))`,
-    ], 3000);
+    const dbQuery = await runCmd(
+      "python3",
+      [
+        "-c",
+        `import sqlite3,json;c=sqlite3.connect('file:///home/ubuntu/billbot-mcpjungle/mcpjungle.db?mode=ro',uri=True);s=c.execute("SELECT COUNT(*) FROM mcp_servers WHERE deleted_at IS NULL").fetchone()[0];t=c.execute("SELECT COUNT(*) FROM tools WHERE deleted_at IS NULL AND enabled=1").fetchone()[0];print(json.dumps({"s":s,"t":t}))`,
+      ],
+      3000,
+    );
     if (dbQuery) {
       const parsed = JSON.parse(dbQuery);
       servers = parsed.s ?? 0;

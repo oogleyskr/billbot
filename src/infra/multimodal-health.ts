@@ -60,7 +60,7 @@ async function checkServiceHealth(
       label: config.label,
       host,
       port: config.port,
-      status: status as "ok" | "loading" | "error",
+      status,
       model: typeof body.model === "string" ? body.model : undefined,
       service: typeof body.service === "string" ? body.service : undefined,
       latencyMs,

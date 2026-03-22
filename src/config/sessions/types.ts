@@ -176,6 +176,7 @@ export type SessionEntry = {
   };
   /** Number of facts injected in the most recent recall. */
   memoryCortexFactsInjected?: number;
+  memoryFlushContextHash?: string;
   cliSessionIds?: Record<string, string>;
   claudeCliSessionId?: string;
   label?: string;
