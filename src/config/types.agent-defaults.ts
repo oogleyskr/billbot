@@ -124,6 +124,8 @@ export type ContextPlannerCategoryOverride = {
   extraTools?: string[];
   /** Override the thinking level for this category. */
   thinkingLevel?: string;
+  /** Override the model for this category (e.g., "anthropic/claude-haiku-4-5"). */
+  modelOverride?: string;
   /** Disable this category entirely. */
   disabled?: boolean;
 };

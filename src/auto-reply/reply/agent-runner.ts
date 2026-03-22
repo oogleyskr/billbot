@@ -257,13 +257,24 @@ export async function runReplyAgent(params: {
       `[context-planner] classified: categories=[${contextPlan.categories.join(",")}] ` +
         `tools=${contextPlan.toolAllowlist ? `${contextPlan.toolAllowlist.length}` : "all"} ` +
         `memory=${contextPlan.memoryParams.maxFacts}/${contextPlan.memoryParams.maxTokens} ` +
-        `thinking=${contextPlan.thinkLevel}`,
+        `thinking=${contextPlan.thinkLevel}` +
+        (contextPlan.modelOverride ? ` model=${contextPlan.modelOverride}` : ""),
     );
   }
 
   // Apply thinking level override from context planner
   if (contextPlan?.thinkLevel && contextPlannerConfig?.thinkingTuning !== false) {
     followupRun.run.thinkLevel = contextPlan.thinkLevel;
+  }
+
+  // Apply model override from context planner (per-category model routing)
+  if (contextPlan?.modelOverride) {
+    const parts = contextPlan.modelOverride.split("/");
+    if (parts.length === 2) {
+      followupRun.run.provider = parts[0]!;
+      followupRun.run.model = parts[1]!;
+      logVerbose(`[context-planner] model override: ${contextPlan.modelOverride}`);
+    }
   }
 
   // Memory Cortex: recall relevant memories before LLM call

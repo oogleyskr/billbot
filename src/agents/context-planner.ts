@@ -19,6 +19,8 @@ export type ContextPlan = {
   };
   /** Thinking level override. */
   thinkLevel: ThinkLevel;
+  /** Model override from category config (e.g., "anthropic/claude-haiku-4-5"). */
+  modelOverride: string | null;
   /** Optional prompt hint (null if disabled). */
   hint: string | null;
 };
@@ -293,6 +295,7 @@ const FALLBACK_PLAN: ContextPlan = {
   categories: [],
   toolAllowlist: null,
   thinkLevel: "low",
+  modelOverride: null,
   memoryParams: { maxFacts: 15, maxTokens: 500, skip: false },
   hint: null,
 };
@@ -384,10 +387,20 @@ export function classifyMessage(message: string, config?: ContextPlannerConfig):
     thinkLevel = "low";
   }
 
+  // Model override: use the first matched category that has a modelOverride in config
+  let modelOverride: string | null = null;
+  for (const m of matched) {
+    const override = config?.categories?.[m.cat.name]?.modelOverride;
+    if (override) {
+      modelOverride = override;
+      break;
+    }
+  }
+
   // Prompt hint
   const hint =
     config?.promptAnnotation !== false
-      ? `[Context: ${categories.join(" + ")} task | tools: ${toolAllowlist ? toolAllowlist.length : "all"} | thinking: ${thinkLevel}]`
+      ? `[Context: ${categories.join(" + ")} task | tools: ${toolAllowlist ? toolAllowlist.length : "all"} | thinking: ${thinkLevel}${modelOverride ? ` | model: ${modelOverride}` : ""}]`
       : null;
 
   return {
@@ -395,6 +408,7 @@ export function classifyMessage(message: string, config?: ContextPlannerConfig):
     toolAllowlist,
     memoryParams,
     thinkLevel,
+    modelOverride,
     hint,
   };
 }
