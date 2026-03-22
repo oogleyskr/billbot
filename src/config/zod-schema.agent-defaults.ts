@@ -212,6 +212,7 @@ export const AgentDefaultsSchema = z
                 extraPatterns: z.array(z.string()).optional(),
                 extraTools: z.array(z.string()).optional(),
                 thinkingLevel: z.string().optional(),
+                modelOverride: z.string().optional(),
                 disabled: z.boolean().optional(),
               })
               .strict(),
